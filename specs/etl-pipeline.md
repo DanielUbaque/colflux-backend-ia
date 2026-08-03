@@ -219,35 +219,29 @@ path("api/fuentes-datos/<int:fuente_id>/carga/<int:carga_id>/importar/", views.i
 
 ---
 
-### Fase 4 — Descarga CSV post-importación
+### Fase 4 — Descarga Excel post-importación ✅
 
 **Qué**: exportar los registros que se importaron tal como quedaron en BD — con las columnas
-del modelo Django y los valores canónicos (no el archivo original).
+del modelo Django y los valores canónicos (no el archivo original). Un único `.xlsx` con
+una pestaña por cada vista desnormalizada (`submuestra_co2`, `unidad_muestreo`), igual a como
+se ven en `etl-datos.html`.
 
-**Endpoint nuevo**:
+**Endpoint**:
 ```
 GET /api/fuentes-datos/<id>/carga/<carga_id>/exportar/
-Response: archivo CSV (Content-Disposition: attachment)
+Response: archivo .xlsx (Content-Disposition: attachment), una hoja por vista con datos
 ```
 
-**Lógica**:
-- Leer qué modelos y campos se importaron en esa carga (vía `MapeoColumna`)
-- Consultar los registros correspondientes en BD
-- Construir un DataFrame con esos campos y devolver como CSV
+**Lógica**: `carga.pks_importados` (ya guardado por `importar_carga`) da, por modelo, los pk
+creados/reutilizados por esta carga. `_preparar_vista_carga` arma el queryset desnormalizado
+por vista (compartido con `datos_carga`); `exportar_carga` recorre todas las vistas, arma un
+`DataFrame` por cada una con datos y las escribe con `pandas.ExcelWriter(engine="openpyxl")`.
 
-**Nota de diseño**: para poder reconstruir exactamente qué registros creó una carga,
-`importar_carga` debe guardar los IDs creados. Opciones:
-- Campo `ids_importados = JSONField(default=dict)` en `CargaArchivo`
-  (ej. `{"Publicacion": [1, 2, 3], "Sitio": [5, 6]}`)
-- O bien filtrar por `created_at` cercano al momento de importación (menos preciso)
-
-**Recomendado**: agregar `ids_importados` a `CargaArchivo`.
-
-**Archivos a tocar**:
-- `app/models/datos.py` — agregar `ids_importados` a `CargaArchivo`
-- `app/views.py` — nueva función `exportar_carga`
-- `app/urls.py` — agregar URL
-- `docs/pages/etl-upload.html` — botón "Descargar CSV" en pantalla de resultado
+**Archivos tocados**:
+- `app/api/etl/views.py` — `_preparar_vista_carga`, `_fila_desde_objeto` (refactor compartido),
+  `exportar_carga`
+- `app/api/urls.py` — URL `exportar-carga`
+- `docs/pages/etl-datos.html` — botón "⬇ Descargar Excel"
 
 ---
 

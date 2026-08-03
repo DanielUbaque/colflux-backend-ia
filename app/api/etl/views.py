@@ -1,4 +1,5 @@
 import csv
+import io
 import json
 import math
 import re
@@ -11,7 +12,7 @@ import pandas as pd
 from django.apps import apps
 from django.conf import settings
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from app.models import CargaArchivo, FuenteDatos, MapeoColumna
@@ -1476,35 +1477,19 @@ def _valor_campo_plano(obj, field):
     return valor
 
 
-def datos_carga(request, fuente_id, carga_id):
-    try:
-        carga = CargaArchivo.objects.get(pk=carga_id, fuente_id=fuente_id)
-    except CargaArchivo.DoesNotExist:
-        return JsonResponse({"error": "Carga no encontrada"}, status=404)
-
-    nombre_vista = request.GET.get("vista", "submuestra_co2")
+def _preparar_vista_carga(carga, nombre_vista, filtros_raw):
+    """Resuelve vista + queryset filtrado/ordenado para una carga, compartido
+    entre `datos_carga` (paginado, JSON) y `exportar_carga` (completo, CSV)."""
     vista = _VISTAS_DESNORMALIZADAS.get(nombre_vista)
     if vista is None:
-        return JsonResponse({"error": f"Vista desconocida: {nombre_vista}"}, status=400)
+        return None, None, None, f"Vista desconocida: {nombre_vista}"
 
     cadena = vista["cadena"]
     modelo_base = vista["modelo_base"]
 
     pks = (carga.pks_importados or {}).get(modelo_base, [])
     if not pks:
-        return JsonResponse({
-            "total": 0, "columnas": [], "filas": [], "vistas": list(_VISTAS_DESNORMALIZADAS.keys()),
-            "advertencia": f"Esta carga todavía no tiene {modelo_base} importado.",
-        }, json_dumps_params={"ensure_ascii": False})
-
-    try:
-        offset = max(int(request.GET.get("offset", 0)), 0)
-    except ValueError:
-        offset = 0
-    try:
-        limite = min(max(int(request.GET.get("limite", 500)), 1), 2000)
-    except ValueError:
-        limite = 500
+        return vista, None, None, None
 
     columnas = [
         {"clave": f"{modelo_nombre}.{f.name}", "modelo": modelo_nombre, "campo": f.name,
@@ -1523,7 +1508,7 @@ def datos_carga(request, fuente_id, carga_id):
     qs = ModeloBase.objects.filter(pk__in=pks).select_related(*_select_related_de_cadena(cadena))
 
     try:
-        filtros = json.loads(request.GET.get("filtros") or "{}")
+        filtros = json.loads(filtros_raw or "{}")
     except json.JSONDecodeError:
         filtros = {}
     for clave, texto in filtros.items():
@@ -1533,16 +1518,47 @@ def datos_carga(request, fuente_id, carga_id):
         qs = qs.filter(**{f"{'__'.join(ruta_orm)}__icontains": texto})
 
     qs = qs.order_by(*vista["orden"])
-    total = qs.count()
+    return vista, columnas, qs, None
 
-    filas = []
-    for obj in qs[offset:offset + limite]:
-        fila = {}
-        for modelo_nombre, ruta in cadena:
-            related_obj = obj if not ruta else _resolver_ruta(obj, ruta)
-            for f in _campos_planos(apps.get_model("app", modelo_nombre)):
-                fila[f"{modelo_nombre}.{f.name}"] = _valor_campo_plano(related_obj, f)
-        filas.append(fila)
+
+def _fila_desde_objeto(obj, cadena):
+    fila = {}
+    for modelo_nombre, ruta in cadena:
+        related_obj = obj if not ruta else _resolver_ruta(obj, ruta)
+        for f in _campos_planos(apps.get_model("app", modelo_nombre)):
+            fila[f"{modelo_nombre}.{f.name}"] = _valor_campo_plano(related_obj, f)
+    return fila
+
+
+def datos_carga(request, fuente_id, carga_id):
+    try:
+        carga = CargaArchivo.objects.get(pk=carga_id, fuente_id=fuente_id)
+    except CargaArchivo.DoesNotExist:
+        return JsonResponse({"error": "Carga no encontrada"}, status=404)
+
+    nombre_vista = request.GET.get("vista", "submuestra_co2")
+    vista, columnas, qs, error = _preparar_vista_carga(carga, nombre_vista, request.GET.get("filtros"))
+    if error:
+        return JsonResponse({"error": error}, status=400)
+
+    if qs is None:
+        return JsonResponse({
+            "total": 0, "columnas": [], "filas": [], "vistas": list(_VISTAS_DESNORMALIZADAS.keys()),
+            "advertencia": f"Esta carga todavía no tiene {vista['modelo_base']} importado.",
+        }, json_dumps_params={"ensure_ascii": False})
+
+    try:
+        offset = max(int(request.GET.get("offset", 0)), 0)
+    except ValueError:
+        offset = 0
+    try:
+        limite = min(max(int(request.GET.get("limite", 500)), 1), 2000)
+    except ValueError:
+        limite = 500
+
+    total = qs.count()
+    cadena = vista["cadena"]
+    filas = [_fila_desde_objeto(obj, cadena) for obj in qs[offset:offset + limite]]
 
     return JsonResponse({
         "total": total,
@@ -1552,3 +1568,45 @@ def datos_carga(request, fuente_id, carga_id):
         "filas": filas,
         "vistas": list(_VISTAS_DESNORMALIZADAS.keys()),
     }, json_dumps_params={"ensure_ascii": False})
+
+
+_NOMBRES_HOJA_VISTA = {
+    "submuestra_co2": "Muestras CO2 (detalle)",
+    "unidad_muestreo": "Unidad Muestreo-Experimental",
+}
+
+
+def exportar_carga(request, fuente_id, carga_id):
+    """Descarga en un único Excel todos los datos importados por esta carga:
+    una pestaña por cada vista desnormalizada que tenga registros."""
+    try:
+        carga = CargaArchivo.objects.get(pk=carga_id, fuente_id=fuente_id)
+    except CargaArchivo.DoesNotExist:
+        return JsonResponse({"error": "Carga no encontrada"}, status=404)
+
+    buffer = io.BytesIO()
+    hojas_escritas = 0
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        for nombre_vista in _VISTAS_DESNORMALIZADAS:
+            vista, columnas, qs, error = _preparar_vista_carga(carga, nombre_vista, None)
+            if error or qs is None:
+                continue
+            cadena = vista["cadena"]
+            claves = [c["clave"] for c in columnas]
+            encabezados = [c["verbose_name"] or c["campo"] for c in columnas]
+            filas = [_fila_desde_objeto(obj, cadena) for obj in qs.iterator()]
+            df = pd.DataFrame([[fila[clave] for clave in claves] for fila in filas], columns=encabezados)
+            hoja = _NOMBRES_HOJA_VISTA.get(nombre_vista, nombre_vista)[:31]
+            df.to_excel(writer, sheet_name=hoja, index=False)
+            hojas_escritas += 1
+
+    if not hojas_escritas:
+        return JsonResponse({"error": "Esta carga todavía no tiene datos importados."}, status=404)
+
+    buffer.seek(0)
+    response = HttpResponse(
+        buffer.read(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="carga_{carga_id}.xlsx"'
+    return response

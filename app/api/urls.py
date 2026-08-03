@@ -5,11 +5,15 @@ from rest_framework.routers import DefaultRouter
 from app.api.dashboard.views import DashboardView, DataModelView, VisualizerView, chart_data
 from app.api.datos.views import FuenteDatosViewSet, fuentes_datos_api
 from app.api.etl.views import (
-    archivo_fuente, campos_destino, datos_carga, importar_carga, mapeo_carga, previsualizar_carga, upload_archivo,
-    validar_carga,
+    archivo_fuente, campos_destino, datos_carga, exportar_carga, importar_carga, mapeo_carga, previsualizar_carga,
+    upload_archivo, validar_carga,
 )
 from app.api.institucion.views import InstitucionViewSet
 from app.api.proyecto.views import ProyectoViewSet
+from app.api.reglas.views import (
+    aplicar_regla_autollenado, deshacer_lote_autollenado, detalle_regla_autollenado,
+    parametros_regla_autollenado, previsualizar_regla_autollenado, reglas_autollenado,
+)
 from app.api.reportador.views import ReportadorViewSet
 from app.api.usuario.views import RolUsuarioViewSet, UsuarioViewSet
 
@@ -40,5 +44,12 @@ urlpatterns = [
     path("api/fuentes-datos/<int:fuente_id>/carga/<int:carga_id>/previsualizar/", previsualizar_carga, name="previsualizar-carga"),
     path("api/fuentes-datos/<int:fuente_id>/carga/<int:carga_id>/importar/", importar_carga, name="importar-carga"),
     path("api/fuentes-datos/<int:fuente_id>/carga/<int:carga_id>/datos/", datos_carga, name="datos-carga"),
+    path("api/fuentes-datos/<int:fuente_id>/carga/<int:carga_id>/exportar/", exportar_carga, name="exportar-carga"),
+    path("api/reglas-autollenado/", reglas_autollenado, name="reglas-autollenado"),
+    path("api/reglas-autollenado/<str:codigo>/", detalle_regla_autollenado, name="reglas-autollenado-detalle"),
+    path("api/reglas-autollenado/<str:codigo>/parametros/", parametros_regla_autollenado, name="reglas-autollenado-parametros"),
+    path("api/reglas-autollenado/<str:codigo>/previsualizar/", previsualizar_regla_autollenado, name="reglas-autollenado-previsualizar"),
+    path("api/reglas-autollenado/<str:codigo>/aplicar/", aplicar_regla_autollenado, name="reglas-autollenado-aplicar"),
+    path("api/reglas-autollenado/lotes/<uuid:lote_id>/deshacer/", deshacer_lote_autollenado, name="reglas-autollenado-deshacer"),
     path("", include(router.urls)),
 ]

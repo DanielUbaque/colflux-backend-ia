@@ -21,6 +21,8 @@ from .publicacion import Autor, Publicacion, PublicacionAutor, PublicacionSitio,
 
 from .datos import CargaArchivo, FuenteDatos, MapeoColumna, RolUsuario, Usuario, UsuarioRol
 
+from .reglas import AplicacionRegla, ReglaAutollenado
+
 __all__ = [
     "TimestampedModel",
     # Geografía
@@ -67,6 +69,8 @@ __all__ = [
     "FuenteDatos",
     "CargaArchivo",
     "MapeoColumna",
+    "ReglaAutollenado",
+    "AplicacionRegla",
     # Publicaciones
     "Autor",
     "Publicacion",

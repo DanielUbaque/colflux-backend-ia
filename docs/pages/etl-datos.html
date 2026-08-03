@@ -79,6 +79,18 @@
     }
     .th-filtro-row input:focus { border-color: var(--green); outline: none; }
 
+    .th-regla-row th { padding: 4px 8px; text-align: left; }
+    .btn-validacion {
+      display: inline-flex; align-items: center; gap: 5px; background: white; border: 1.5px solid var(--border);
+      border-radius: 7px; padding: 3px 9px; font-size: .72rem; font-weight: 600; font-family: inherit;
+      color: var(--gray); cursor: pointer;
+    }
+    .btn-validacion:hover { border-color: var(--green); color: var(--green-d); }
+    .btn-validacion[data-con-pendientes="true"] { border-color: var(--amber); color: #92400e; }
+    .badge-pendientes {
+      background: var(--amber); color: white; border-radius: 10px; padding: 1px 6px; font-size: .68rem; font-weight: 700;
+    }
+
     .tabs { display: flex; gap: 6px; margin: 20px 0 0; }
     .tab-btn {
       background: white; border: 1.5px solid var(--border); border-bottom: none; border-radius: 10px 10px 0 0;
@@ -110,6 +122,7 @@
     <div class="toolbar-info" id="toolbarInfo"></div>
     <div class="toolbar-actions">
       <button class="btn-secondary" id="btnLimpiarFiltros" style="display:none;">✕ Limpiar filtros</button>
+      <button class="btn-secondary" id="btnDescargarCsv">⬇ Descargar Excel</button>
       <a class="btn-secondary" id="linkVolver" href="etl-upload.html">← Volver al ETL</a>
     </div>
   </div>
@@ -135,7 +148,10 @@
     unidad_muestreo: 'Unidad de Muestreo / Experimental',
   };
 
-  const state = { vista: 'submuestra_co2', offset: 0, limite: 200, total: 0, columnas: [], filas: [], filtros: {}, vistasDisponibles: [] };
+  const state = {
+    vista: 'submuestra_co2', offset: 0, limite: 200, total: 0, columnas: [], filas: [], filtros: {},
+    vistasDisponibles: [], reglas: {},
+  };
 
   // Colores por modelo, para agrupar visualmente las columnas de la tabla
   // (cada modelo de la cadena SubmuestraCO2 → … → Sitio tiene su color).
@@ -195,6 +211,7 @@
       return;
     }
 
+
     const grupos = [];
     state.columnas.forEach(c => {
       const ultimo = grupos[grupos.length - 1];
@@ -213,6 +230,18 @@
         <input type="text" placeholder="filtrar…" data-clave="${escapeHtml(c.clave)}" value="${escapeHtml(state.filtros[c.clave] || '')}">
       </th>
     `).join('');
+    const hayReglas = state.columnas.some(c => state.reglas[c.clave]);
+    const theadRegla = hayReglas ? state.columnas.map(c => {
+      const regla = state.reglas[c.clave];
+      if (!regla) return '<th></th>';
+      const tienePendientes = regla.pendientes > 0;
+      return `<th>
+        <button type="button" class="btn-validacion" title="${escapeHtml(regla.nombre)}"
+          data-ver-regla="${regla.codigo}" data-con-pendientes="${tienePendientes}">
+          🛡️ Validación${tienePendientes ? `<span class="badge-pendientes">${regla.pendientes}</span>` : ''}
+        </button>
+      </th>`;
+    }).join('') : '';
 
     const filasHtml = state.filas.map(fila => {
       const celdas = state.columnas.map(c => {
@@ -228,6 +257,7 @@
           <thead>
             <tr class="th-modelo-row">${theadModelo}</tr>
             <tr class="th-campo-row">${theadCampo}</tr>
+            ${hayReglas ? `<tr class="th-regla-row">${theadRegla}</tr>` : ''}
             <tr class="th-filtro-row">${theadFiltro}</tr>
           </thead>
           <tbody>${filasHtml}</tbody>
@@ -261,6 +291,27 @@
       state.offset += state.limite;
       cargarDatos();
     });
+
+    contenido.querySelectorAll('[data-ver-regla]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const qs = new URLSearchParams({ codigo: btn.dataset.verRegla, fuente: fuenteId || '', carga: cargaId || '' });
+        window.location.href = `regla-detalle.html?${qs}`;
+      });
+    });
+  }
+
+  async function cargarReglas() {
+    try {
+      const res = await fetch(`${API_BASE}/api/reglas-autollenado/`);
+      const data = await res.json().catch(() => ({}));
+      state.reglas = {};
+      (data.reglas || []).forEach(r => {
+        state.reglas[`${r.modelo_destino}.${r.campo_destino}`] = r;
+      });
+    } catch (e) {
+      // Sin reglas disponibles no es un error bloqueante para ver los datos.
+      state.reglas = {};
+    }
   }
 
   async function cargarDatos() {
@@ -314,7 +365,14 @@
     cargarDatos();
   });
 
-  cargarDatos();
+  document.getElementById('btnDescargarCsv').addEventListener('click', () => {
+    window.location.href = `${API_BASE}/api/fuentes-datos/${fuenteId}/carga/${cargaId}/exportar/`;
+  });
+
+  (async () => {
+    await cargarReglas();
+    await cargarDatos();
+  })();
 </script>
 </body>
 </html>
