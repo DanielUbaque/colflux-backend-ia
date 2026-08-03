@@ -6,39 +6,8 @@
   <title>COLFLUX — Reglas del atributo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/reglas.css">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', sans-serif; color: #1a2236; background: #f8fafc; line-height: 1.6; }
-
-    :root {
-      --green:   #18735d; --green-l: #e6f4f0; --green-d: #0d4f40;
-      --amber:   #d97706; --amber-l: #fef3c7;
-      --red:     #dc2626; --red-l:   #fee2e2;
-      --gray:    #64748b; --gray-l:  #f1f5f9;
-      --border:  #e2e8f0;
-    }
-
-    .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
-
-    nav {
-      position: sticky; top: 0; z-index: 100;
-      background: rgba(255,255,255,.96); backdrop-filter: blur(8px);
-      border-bottom: 1px solid var(--border); padding: 12px 0;
-    }
-    .nav-inner { display: flex; align-items: center; justify-content: space-between; max-width: 1400px; margin: 0 auto; padding: 0 24px; }
-    .nav-logo { font-weight: 800; font-size: 1rem; color: var(--green-d); text-decoration: none; display: flex; align-items: center; gap: 8px; }
-    .nav-links { display: flex; gap: 24px; list-style: none; }
-    .nav-links a { color: var(--gray); font-size: .85rem; font-weight: 500; text-decoration: none; transition: color .2s; }
-    .nav-links a:hover, .nav-links a.active { color: var(--green); font-weight: 700; }
-    .nav-pill { background: var(--green-d); color: white; font-size: .75rem; font-weight: 700; padding: 5px 12px; border-radius: 20px; text-decoration: none; }
-    @media (max-width: 600px) { .nav-links { display: none; } }
-
-    .hero { background: #0d4f40; color: white; padding: 40px 0 28px; }
-    .hero-badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.3); border-radius: 20px; padding: 4px 14px; font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 14px; }
-    .hero h1 { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800; margin-bottom: 6px; }
-    .hero p { font-size: .88rem; color: rgba(255,255,255,.8); }
-
     .tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin: 24px 0; }
     .tarjeta {
       background: white; border: 1.5px solid var(--border); border-radius: 12px; padding: 22px;
@@ -50,14 +19,6 @@
     .tarjeta p { font-size: .82rem; color: var(--gray); margin-bottom: 10px; }
     .tarjeta .pendientes-badge { display: inline-block; background: var(--amber-l); color: #92400e; border-radius: 20px; padding: 3px 10px; font-size: .76rem; font-weight: 700; }
     .tarjeta .ir { font-size: .8rem; font-weight: 700; color: var(--green); }
-
-    .btn-secondary { background: white; color: var(--gray); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 16px; font-size: .84rem; font-weight: 600; font-family: inherit; cursor: pointer; text-decoration: none; display: inline-block; }
-    .btn-secondary:hover { border-color: var(--gray); color: #1a2236; }
-
-    .estado-box { padding: 40px 0; text-align: center; color: var(--gray); font-size: .9rem; }
-    .error-box { background: var(--red-l); color: var(--red); border-radius: 10px; padding: 14px 18px; font-size: .85rem; margin: 16px 0; }
-
-    footer { background: #0d1117; color: rgba(255,255,255,.5); padding: 28px 0; font-size: .82rem; margin-top: 40px; }
   </style>
 </head>
 <body>
@@ -80,27 +41,19 @@
 
 <script src="../assets/js/layout.js"></script>
 <script src="../assets/js/role-guard.js"></script>
+<script src="../assets/js/reglas-comun.js"></script>
 <script src="../config/services.js"></script>
 <script>
   const API_BASE = window.COLFLUX_CONFIG.apiBaseUrl;
+  const { escapeHtml, conFuenteCarga } = ReglasComun;
+  const { fuenteId, cargaId } = ReglasComun.leerFuenteCarga();
   const params = new URLSearchParams(window.location.search);
   const campo = params.get('campo');
-  const fuenteId = params.get('fuente');
-  const cargaId = params.get('carga');
 
   const state = { reglas: null, mensaje: null };
 
-  function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
   function qsPara(extra) {
-    const qs = new URLSearchParams(extra);
-    if (fuenteId) qs.set('fuente', fuenteId);
-    if (cargaId) qs.set('carga', cargaId);
-    return qs;
+    return conFuenteCarga(extra, fuenteId, cargaId);
   }
 
   function volverUrl() {
@@ -164,9 +117,7 @@
 
   async function cargarReglas() {
     try {
-      const res = await fetch(`${API_BASE}/api/reglas-autollenado/`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      const data = await ReglasComun.listarReglas(API_BASE);
       state.reglas = (data.reglas || []).filter(r => `${r.modelo_destino}.${r.campo_destino}` === campo);
     } catch (e) {
       state.mensaje = { ok: false, texto: `Error al cargar las reglas: ${e.message}` };

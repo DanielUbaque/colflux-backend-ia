@@ -84,6 +84,13 @@ def _candidatos_hora_submuestra_co2(parametros):
     return candidatos
 
 
+def _contar_pendientes_hora_submuestra_co2():
+    """Cuenta cuántas SubmuestraCO2 tienen `hora` nula (mismo filtro que
+    `_candidatos_hora_submuestra_co2`, pero sin traer ni procesar filas: solo
+    para saber cuántas hay pendientes, p. ej. para el badge de la UI)."""
+    return SubmuestraCO2.objects.exclude(condicion_luz="").filter(hora__isnull=True).count()
+
+
 CASOS_ETIQUETAS = {
     "referencia_fecha": "Con hora de referencia en la misma fecha",
     "hora_base": "Sin referencia — usa la hora base por condición de luz",
@@ -171,6 +178,7 @@ REGLAS = {
             {"clave": "incremento_minutos", "etiqueta": "Incremento entre tomas de la misma muestra (minutos)", "tipo": "number"},
         ],
         "calcular_candidatos": _candidatos_hora_submuestra_co2,
+        "contar_pendientes": _contar_pendientes_hora_submuestra_co2,
         "validar_valores": _validar_hora_submuestra_co2,
     },
 }
@@ -188,14 +196,18 @@ def obtener_parametros(codigo):
 def listar_reglas():
     resultado = []
     for codigo, config in REGLAS.items():
-        candidatos = config["calcular_candidatos"](obtener_parametros(codigo))
+        contar_pendientes = config.get("contar_pendientes")
+        if contar_pendientes:
+            pendientes = contar_pendientes()
+        else:
+            pendientes = len(config["calcular_candidatos"](obtener_parametros(codigo)))
         resultado.append({
             "codigo": codigo,
             "nombre": config["nombre"],
             "descripcion": config["descripcion"],
             "modelo_destino": config["modelo_destino"],
             "campo_destino": config["campo_destino"],
-            "pendientes": len(candidatos),
+            "pendientes": pendientes,
             "tiene_validacion": bool(config.get("validar_valores")),
         })
     return resultado

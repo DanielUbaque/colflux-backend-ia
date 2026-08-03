@@ -1,0 +1,58 @@
+/* Estilos compartidos por las páginas de reglas de autollenado / validación:
+   regla-detalle.html, regla-validacion.html, reglas-campo.html. Cada página
+   solo debe definir en su propio <style> lo que sea específico de ella. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', sans-serif; color: #1a2236; background: #f8fafc; line-height: 1.6; }
+
+:root {
+  --green:   #18735d; --green-l: #e6f4f0; --green-d: #0d4f40;
+  --amber:   #d97706; --amber-l: #fef3c7;
+  --red:     #dc2626; --red-l:   #fee2e2;
+  --gray:    #64748b; --gray-l:  #f1f5f9;
+  --border:  #e2e8f0;
+}
+
+.container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(255,255,255,.96); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border); padding: 12px 0;
+}
+.nav-inner { display: flex; align-items: center; justify-content: space-between; max-width: 1400px; margin: 0 auto; padding: 0 24px; }
+.nav-logo { font-weight: 800; font-size: 1rem; color: var(--green-d); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+.nav-links { display: flex; gap: 24px; list-style: none; }
+.nav-links a { color: var(--gray); font-size: .85rem; font-weight: 500; text-decoration: none; transition: color .2s; }
+.nav-links a:hover, .nav-links a.active { color: var(--green); font-weight: 700; }
+.nav-pill { background: var(--green-d); color: white; font-size: .75rem; font-weight: 700; padding: 5px 12px; border-radius: 20px; text-decoration: none; }
+@media (max-width: 600px) { .nav-links { display: none; } }
+
+.hero { background: #0d4f40; color: white; padding: 40px 0 28px; }
+.hero-badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.3); border-radius: 20px; padding: 4px 14px; font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 14px; }
+.hero h1 { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800; margin-bottom: 6px; }
+.hero p { font-size: .88rem; color: rgba(255,255,255,.8); }
+
+.card { background: white; border: 1.5px solid var(--border); border-radius: 12px; padding: 24px; margin: 24px 0; }
+.card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 12px; }
+.card p.descripcion { font-size: .88rem; color: var(--gray); margin-bottom: 4px; }
+
+.btn-secondary { background: white; color: var(--gray); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 16px; font-size: .84rem; font-weight: 600; font-family: inherit; cursor: pointer; text-decoration: none; display: inline-block; }
+.btn-secondary:hover { border-color: var(--gray); color: #1a2236; }
+.btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--green-d); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: .84rem; font-weight: 700; font-family: inherit; cursor: pointer; }
+.btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+.btn-warn { background: var(--amber); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: .84rem; font-weight: 700; font-family: inherit; cursor: pointer; }
+
+.ejemplo-tabla { width: 100%; border-collapse: collapse; font-size: .8rem; margin-top: 10px; }
+.ejemplo-tabla th, .ejemplo-tabla td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+.ejemplo-tabla th { color: var(--gray); font-weight: 700; font-size: .72rem; text-transform: uppercase; }
+
+.estado-box { padding: 40px 0; text-align: center; color: var(--gray); font-size: .9rem; }
+.error-box { background: var(--red-l); color: var(--red); border-radius: 10px; padding: 14px 18px; font-size: .85rem; margin: 16px 0; }
+.ok-box { background: var(--green-l); color: var(--green-d); border-radius: 10px; padding: 14px 18px; font-size: .85rem; margin: 16px 0; }
+
+.pendientes-badge { display: inline-block; background: var(--amber-l); color: #92400e; border-radius: 20px; padding: 4px 12px; font-size: .8rem; font-weight: 700; }
+
+footer { background: #0d1117; color: rgba(255,255,255,.5); padding: 28px 0; font-size: .82rem; margin-top: 40px; }

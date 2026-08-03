@@ -6,70 +6,16 @@
   <title>COLFLUX — Regla de autollenado</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/reglas.css">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body { font-family: 'Inter', sans-serif; color: #1a2236; background: #f8fafc; line-height: 1.6; }
-
-    :root {
-      --green:   #18735d; --green-l: #e6f4f0; --green-d: #0d4f40;
-      --amber:   #d97706; --amber-l: #fef3c7;
-      --red:     #dc2626; --red-l:   #fee2e2;
-      --gray:    #64748b; --gray-l:  #f1f5f9;
-      --border:  #e2e8f0;
-    }
-
-    .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
-
-    nav {
-      position: sticky; top: 0; z-index: 100;
-      background: rgba(255,255,255,.96); backdrop-filter: blur(8px);
-      border-bottom: 1px solid var(--border); padding: 12px 0;
-    }
-    .nav-inner { display: flex; align-items: center; justify-content: space-between; max-width: 1400px; margin: 0 auto; padding: 0 24px; }
-    .nav-logo { font-weight: 800; font-size: 1rem; color: var(--green-d); text-decoration: none; display: flex; align-items: center; gap: 8px; }
-    .nav-links { display: flex; gap: 24px; list-style: none; }
-    .nav-links a { color: var(--gray); font-size: .85rem; font-weight: 500; text-decoration: none; transition: color .2s; }
-    .nav-links a:hover, .nav-links a.active { color: var(--green); font-weight: 700; }
-    .nav-pill { background: var(--green-d); color: white; font-size: .75rem; font-weight: 700; padding: 5px 12px; border-radius: 20px; text-decoration: none; }
-    @media (max-width: 600px) { .nav-links { display: none; } }
-
-    .hero { background: #0d4f40; color: white; padding: 40px 0 28px; }
-    .hero-badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.3); border-radius: 20px; padding: 4px 14px; font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 14px; }
-    .hero h1 { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800; margin-bottom: 6px; }
-    .hero p { font-size: .88rem; color: rgba(255,255,255,.8); }
-
-    .card { background: white; border: 1.5px solid var(--border); border-radius: 12px; padding: 24px; margin: 24px 0; }
-    .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 12px; }
-    .card p.descripcion { font-size: .88rem; color: var(--gray); margin-bottom: 4px; }
-
     .campo { margin-bottom: 14px; }
     .campo label { display: block; font-size: .82rem; font-weight: 600; margin-bottom: 5px; }
     .campo input { border: 1.5px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: .86rem; font-family: inherit; width: 220px; }
     .campo input:focus { border-color: var(--green); outline: none; }
 
-    .btn-secondary { background: white; color: var(--gray); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 16px; font-size: .84rem; font-weight: 600; font-family: inherit; cursor: pointer; text-decoration: none; display: inline-block; }
-    .btn-secondary:hover { border-color: var(--gray); color: #1a2236; }
-    .btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
-    .btn-primary { background: var(--green-d); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: .84rem; font-weight: 700; font-family: inherit; cursor: pointer; }
-    .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
-    .btn-warn { background: var(--amber); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: .84rem; font-weight: 700; font-family: inherit; cursor: pointer; }
-
-    .ejemplo-tabla { width: 100%; border-collapse: collapse; font-size: .8rem; margin-top: 10px; }
-    .ejemplo-tabla th, .ejemplo-tabla td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; }
-    .ejemplo-tabla th { color: var(--gray); font-weight: 700; font-size: .72rem; text-transform: uppercase; }
-
-    .estado-box { padding: 40px 0; text-align: center; color: var(--gray); font-size: .9rem; }
-    .error-box { background: var(--red-l); color: var(--red); border-radius: 10px; padding: 14px 18px; font-size: .85rem; margin: 16px 0; }
-    .ok-box { background: var(--green-l); color: var(--green-d); border-radius: 10px; padding: 14px 18px; font-size: .85rem; margin: 16px 0; }
-
-    .pendientes-badge { display: inline-block; background: var(--amber-l); color: #92400e; border-radius: 20px; padding: 4px 12px; font-size: .8rem; font-weight: 700; }
-
     .caso-seccion { margin-top: 20px; }
     .caso-seccion:first-child { margin-top: 0; }
     .caso-seccion h3 { display: flex; align-items: center; gap: 10px; font-size: .9rem; font-weight: 700; margin-bottom: 8px; }
-
-    footer { background: #0d1117; color: rgba(255,255,255,.5); padding: 28px 0; font-size: .82rem; margin-top: 40px; }
   </style>
 </head>
 <body>
@@ -92,30 +38,23 @@
 
 <script src="../assets/js/layout.js"></script>
 <script src="../assets/js/role-guard.js"></script>
+<script src="../assets/js/reglas-comun.js"></script>
 <script src="../config/services.js"></script>
 <script>
   const API_BASE = window.COLFLUX_CONFIG.apiBaseUrl;
+  const { escapeHtml, conFuenteCarga, cargarDetalleRegla } = ReglasComun;
+  const { fuenteId, cargaId } = ReglasComun.leerFuenteCarga();
   const params = new URLSearchParams(window.location.search);
   const codigo = params.get('codigo');
-  const fuenteId = params.get('fuente');
-  const cargaId = params.get('carga');
 
   const state = {
     detalle: null, confirmandoAplicar: false, guardando: false, aplicando: false, mensaje: null,
     confirmandoDeshacer: null, deshaciendo: null,
   };
 
-  function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
   function volverUrl() {
     if (!state.detalle) return null;
-    const qs = new URLSearchParams({ campo: `${state.detalle.modelo_destino}.${state.detalle.campo_destino}` });
-    if (fuenteId) qs.set('fuente', fuenteId);
-    if (cargaId) qs.set('carga', cargaId);
+    const qs = conFuenteCarga({ campo: `${state.detalle.modelo_destino}.${state.detalle.campo_destino}` }, fuenteId, cargaId);
     return `reglas-campo.html?${qs}`;
   }
 
@@ -148,10 +87,7 @@
     }
 
     function validacionUrl() {
-      const qs = new URLSearchParams({ codigo });
-      if (fuenteId) qs.set('fuente', fuenteId);
-      if (cargaId) qs.set('carga', cargaId);
-      return `regla-validacion.html?${qs}`;
+      return `regla-validacion.html?${conFuenteCarga({ codigo }, fuenteId, cargaId)}`;
     }
 
     const casosSecciones = (d.casos || []).map(caso => `
@@ -283,10 +219,7 @@
 
   async function cargarDetalle() {
     try {
-      const res = await fetch(`${API_BASE}/api/reglas-autollenado/${encodeURIComponent(codigo)}/`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      state.detalle = data;
+      state.detalle = await cargarDetalleRegla(API_BASE, codigo);
     } catch (e) {
       state.mensaje = { ok: false, texto: `Error al cargar la regla: ${e.message}` };
     }
@@ -303,13 +236,11 @@
     state.guardando = true;
     render();
     try {
-      const res = await fetch(`${API_BASE}/api/reglas-autollenado/${encodeURIComponent(codigo)}/parametros/`, {
+      await ReglasComun.fetchJson(`${API_BASE}/api/reglas-autollenado/${encodeURIComponent(codigo)}/parametros/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parametros }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       state.mensaje = { ok: true, texto: 'Parámetros guardados. El ejemplo se recalculó con los nuevos valores.' };
       await cargarDetalle();
     } catch (e) {
@@ -324,13 +255,11 @@
     state.aplicando = true;
     render();
     try {
-      const res = await fetch(`${API_BASE}/api/reglas-autollenado/${encodeURIComponent(codigo)}/aplicar/`, {
+      const data = await ReglasComun.fetchJson(`${API_BASE}/api/reglas-autollenado/${encodeURIComponent(codigo)}/aplicar/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       state.mensaje = { ok: true, texto: `Se aplicó la regla a ${data.aplicados} registros.` };
       state.confirmandoAplicar = false;
       await cargarDetalle();
@@ -347,11 +276,9 @@
     state.deshaciendo = lote;
     render();
     try {
-      const res = await fetch(`${API_BASE}/api/reglas-autollenado/lotes/${encodeURIComponent(lote)}/deshacer/`, {
+      const data = await ReglasComun.fetchJson(`${API_BASE}/api/reglas-autollenado/lotes/${encodeURIComponent(lote)}/deshacer/`, {
         method: 'POST',
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       state.mensaje = { ok: true, texto: `Se deshicieron ${data.deshechas} registros de ese lote.` };
       await cargarDetalle();
     } catch (e) {
