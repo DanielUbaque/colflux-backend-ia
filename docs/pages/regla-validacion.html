@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COLFLUX — Validación de rangos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', sans-serif; color: #1a2236; background: #f8fafc; line-height: 1.6; }
+
+    :root {
+      --green:   #18735d; --green-l: #e6f4f0; --green-d: #0d4f40;
+      --amber:   #d97706; --amber-l: #fef3c7;
+      --red:     #dc2626; --red-l:   #fee2e2;
+      --gray:    #64748b; --gray-l:  #f1f5f9;
+      --border:  #e2e8f0;
+    }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,.96); backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border); padding: 12px 0;
+    }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; max-width: 1400px; margin: 0 auto; padding: 0 24px; }
+    .nav-logo { font-weight: 800; font-size: 1rem; color: var(--green-d); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+    .nav-links { display: flex; gap: 24px; list-style: none; }
+    .nav-links a { color: var(--gray); font-size: .85rem; font-weight: 500; text-decoration: none; transition: color .2s; }
+    .nav-links a:hover, .nav-links a.active { color: var(--green); font-weight: 700; }
+    .nav-pill { background: var(--green-d); color: white; font-size: .75rem; font-weight: 700; padding: 5px 12px; border-radius: 20px; text-decoration: none; }
+    @media (max-width: 600px) { .nav-links { display: none; } }
+
+    .hero { background: #0d4f40; color: white; padding: 40px 0 28px; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.3); border-radius: 20px; padding: 4px 14px; font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 14px; }
+    .hero h1 { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800; margin-bottom: 6px; }
+    .hero p { font-size: .88rem; color: rgba(255,255,255,.8); }
+
+    .card { background: white; border: 1.5px solid var(--border); border-radius: 12px; padding: 24px; margin: 24px 0; }
+    .card h2 { font-size: 1rem; font-weight: 700; margin-bottom: 12px; }
+    .card p.descripcion { font-size: .88rem; color: var(--gray); margin-bottom: 4px; }
+
+    .btn-secondary { background: white; color: var(--gray); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 16px; font-size: .84rem; font-weight: 600; font-family: inherit; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn-secondary:hover { border-color: var(--gray); color: #1a2236; }
+
+    .resumen-tabla { width: 100%; border-collapse: collapse; font-size: .8rem; margin-top: 10px; }
+    .resumen-tabla th, .resumen-tabla td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    .resumen-tabla th { color: var(--gray); font-weight: 700; font-size: .72rem; text-transform: uppercase; }
+
+    .estado-box { padding: 40px 0; text-align: center; color: var(--gray); font-size: .9rem; }
+    .error-box { background: var(--red-l); color: var(--red); border-radius: 10px; padding: 14px 18px; font-size: .85rem; margin: 16px 0; }
+
+    .chart-wrap { position: relative; height: 320px; margin-top: 14px; }
+
+    .leyenda { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; font-size: .78rem; color: var(--gray); }
+    .leyenda span.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+    footer { background: #0d1117; color: rgba(255,255,255,.5); padding: 28px 0; font-size: .82rem; margin-top: 40px; }
+  </style>
+</head>
+<body>
+
+<div id="app-nav"></div>
+
+<div class="hero">
+  <div class="container">
+    <div class="hero-badge">📊 Validación de rangos</div>
+    <h1 id="heroTitulo">Cargando…</h1>
+    <p id="heroSubtitulo"></p>
+  </div>
+</div>
+
+<div class="container" id="app">
+  <div class="estado-box">Cargando validación…</div>
+</div>
+
+<div id="app-footer"></div>
+
+<script src="../assets/js/layout.js"></script>
+<script src="../assets/js/role-guard.js"></script>
+<script src="../config/services.js"></script>
+<script>
+  const API_BASE = window.COLFLUX_CONFIG.apiBaseUrl;
+  const params = new URLSearchParams(window.location.search);
+  const codigo = params.get('codigo');
+  const fuenteId = params.get('fuente');
+  const cargaId = params.get('carga');
+
+  const COLORES = {
+    dia: '#d97706',
+    noche: '#1d4ed8',
+    noche_simulada: '#7c3aed',
+  };
+
+  const RANGOS_ESPERADOS = {
+    dia: { desde: '06:00', hasta: '18:00' },
+  };
+
+  const state = { detalle: null, mensaje: null, chart: null };
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function volverUrl() {
+    if (!state.detalle) return null;
+    const qs = new URLSearchParams({ campo: `${state.detalle.modelo_destino}.${state.detalle.campo_destino}` });
+    if (fuenteId) qs.set('fuente', fuenteId);
+    if (cargaId) qs.set('carga', cargaId);
+    return `reglas-campo.html?${qs}`;
+  }
+
+  function evaluarRango(fila) {
+    const esperado = RANGOS_ESPERADOS[fila.condicion_luz];
+    if (!esperado || !fila.hora_min || !fila.hora_max) return null;
+    const dentro = fila.hora_min >= esperado.desde && fila.hora_max <= esperado.hasta;
+    return dentro
+      ? { ok: true, texto: `Dentro de lo esperado (${esperado.desde}–${esperado.hasta})` }
+      : { ok: false, texto: `Fuera de lo esperado (${esperado.desde}–${esperado.hasta}) — revisar` };
+  }
+
+  function render() {
+    const app = document.getElementById('app');
+    if (!codigo) {
+      app.innerHTML = '<div class="error-box">Falta indicar la regla (parámetro ?codigo= en la URL).</div>';
+      return;
+    }
+    if (!state.detalle) {
+      app.innerHTML = state.mensaje
+        ? `<div class="error-box">${escapeHtml(state.mensaje.texto)}</div>`
+        : '<div class="estado-box">Cargando validación…</div>';
+      return;
+    }
+
+    const d = state.detalle;
+    const validacion = d.validacion || [];
+    document.getElementById('heroTitulo').textContent = `Validación de rangos — ${d.nombre}`;
+    document.getElementById('heroSubtitulo').textContent = `${d.modelo_destino}.${d.campo_destino}, agrupado por condición de luz`;
+
+    const filas = validacion.map(fila => {
+      const chequeo = evaluarRango(fila);
+      return `
+        <tr>
+          <td><span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${COLORES[fila.condicion_luz] || '#94a3b8'};margin-right:6px;"></span>${escapeHtml(fila.etiqueta)}</td>
+          <td>${fila.cantidad}</td>
+          <td>${fila.hora_min ?? '—'} – ${fila.hora_max ?? '—'}</td>
+          <td>${chequeo ? `<span style="color:${chequeo.ok ? 'var(--green)' : 'var(--red)'}; font-weight:600;">${escapeHtml(chequeo.texto)}</span>` : '<span class="descripcion">Sin rango esperado definido</span>'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const volver = volverUrl();
+
+    app.innerHTML = `
+      <div class="card">
+        <h2>Resumen por condición de luz</h2>
+        <p class="descripcion">Rango de horas ya asignadas en <code>${escapeHtml(d.campo_destino)}</code>. Sirve para detectar tomas mal clasificadas (p. ej. una toma "noche" con hora de mediodía).</p>
+        <table class="resumen-tabla">
+          <thead><tr><th>Condición de luz</th><th>Cantidad</th><th>Rango (mín–máx)</th><th>Chequeo</th></tr></thead>
+          <tbody>${filas || '<tr><td colspan="4">No hay valores asignados todavía.</td></tr>'}</tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Distribución de tomas por hora del día</h2>
+        <p class="descripcion">Cantidad de tomas en cada franja horaria (0–23h), una serie por condición de luz. Picos fuera de la franja esperada son candidatos a revisar.</p>
+        <div class="chart-wrap"><canvas id="histograma"></canvas></div>
+      </div>
+
+      ${volver ? `<a class="btn-secondary" href="${volver}">← Volver a las reglas del atributo</a>` : ''}
+    `;
+
+    dibujarHistograma(validacion);
+  }
+
+  function dibujarHistograma(validacion) {
+    const canvas = document.getElementById('histograma');
+    if (!canvas || !validacion.length) return;
+    const etiquetasHoras = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`);
+    const datasets = validacion.map(fila => ({
+      label: fila.etiqueta,
+      data: fila.histograma,
+      backgroundColor: COLORES[fila.condicion_luz] || '#94a3b8',
+    }));
+
+    if (state.chart) state.chart.destroy();
+    state.chart = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels: etiquetasHoras, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { title: { display: true, text: 'Hora del día' } },
+          y: { title: { display: true, text: 'Cantidad de tomas' }, beginAtZero: true },
+        },
+        plugins: { legend: { position: 'bottom' } },
+      },
+    });
+  }
+
+  async function cargarDetalle() {
+    try {
+      const res = await fetch(`${API_BASE}/api/reglas-autollenado/${encodeURIComponent(codigo)}/`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      state.detalle = data;
+    } catch (e) {
+      state.mensaje = { ok: false, texto: `Error al cargar la validación: ${e.message}` };
+    }
+    render();
+  }
+
+  cargarDetalle();
+</script>
+</body>
+</html>

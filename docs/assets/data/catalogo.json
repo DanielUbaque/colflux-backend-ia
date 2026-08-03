@@ -5925,14 +5925,6 @@
                 {
                   "valor": "7",
                   "etiqueta": "CO2 (CSV)"
-                },
-                {
-                  "valor": "10",
-                  "etiqueta": "CO2 (Excel (.xlsx / .xls))"
-                },
-                {
-                  "valor": "9",
-                  "etiqueta": "co2 (CSV)"
                 }
               ],
               "es_fk": true,
@@ -40920,14 +40912,6 @@
                 {
                   "valor": "7",
                   "etiqueta": "CO2 (CSV)"
-                },
-                {
-                  "valor": "10",
-                  "etiqueta": "CO2 (Excel (.xlsx / .xls))"
-                },
-                {
-                  "valor": "9",
-                  "etiqueta": "co2 (CSV)"
                 }
               ],
               "es_fk": true,
@@ -41022,26 +41006,6 @@
               "requerido": true,
               "max_length": null,
               "choices": [
-                {
-                  "valor": "133",
-                  "etiqueta": "Carga #133 — CO2"
-                },
-                {
-                  "valor": "132",
-                  "etiqueta": "Carga #132 — CO2"
-                },
-                {
-                  "valor": "131",
-                  "etiqueta": "Carga #131 — CO2"
-                },
-                {
-                  "valor": "130",
-                  "etiqueta": "Carga #130 — co2"
-                },
-                {
-                  "valor": "129",
-                  "etiqueta": "Carga #129 — co2"
-                },
                 {
                   "valor": "128",
                   "etiqueta": "Carga #128 — CO2"

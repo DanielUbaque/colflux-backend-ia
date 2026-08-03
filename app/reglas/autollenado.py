@@ -14,6 +14,8 @@ from datetime import datetime, time, timedelta
 
 from django.apps import apps
 from django.db import transaction
+from django.db.models import Count, Max, Min
+from django.db.models.functions import ExtractHour
 from django.utils import timezone
 
 from app.models import AplicacionRegla, ReglaAutollenado, SubmuestraCO2
@@ -24,27 +26,47 @@ def _parsear_hora(valor):
 
 
 def _candidatos_hora_submuestra_co2(parametros):
-    """SubmuestraCO2.hora nula: se infiere de `condicion_luz` de la propia
-    toma (día → `hora_dia`, noche/noche simulada → `hora_noche`). Si varias
-    tomas de la misma MuestraCO2 comparten esa base, se separan
-    `incremento_minutos` entre ellas (en orden de `n_toma`) para no repetir
-    la hora."""
+    """SubmuestraCO2.hora nula: si ya existe alguna toma con hora conocida
+    para la misma fecha (de cualquier muestra), esa hora se usa como
+    referencia para todas las tomas sin hora de ese día, en vez del valor
+    por defecto. Si no hay ninguna hora de referencia para la fecha, se
+    infiere de `condicion_luz` de la propia toma (día → `hora_dia`,
+    noche/noche simulada → `hora_noche`). En ambos casos, las tomas que
+    comparten la misma base (misma fecha con referencia, o misma
+    MuestraCO2 sin ella) se separan `incremento_minutos` entre sí (en
+    orden de `n_toma`) para no repetir la hora."""
     hora_dia = _parsear_hora(parametros["hora_dia"])
     hora_noche = _parsear_hora(parametros["hora_noche"])
     incremento = int(parametros["incremento_minutos"])
 
-    qs = (
+    todas = (
         SubmuestraCO2.objects
-        .filter(hora__isnull=True)
         .exclude(condicion_luz="")
         .select_related("muestra")
-        .order_by("muestra_id", "n_toma")
+        .order_by("muestra__fecha", "muestra_id", "n_toma")
     )
+
+    referencia_por_fecha = {}
+    for sub in todas:
+        fecha = sub.muestra.fecha
+        if fecha is not None and sub.hora is not None and fecha not in referencia_por_fecha:
+            referencia_por_fecha[fecha] = sub.hora
+
     contador = {}
     candidatos = []
-    for sub in qs:
-        base = hora_dia if sub.condicion_luz == "dia" else hora_noche
-        clave = (sub.muestra_id, base)
+    for sub in todas:
+        if sub.hora is not None:
+            continue
+        fecha = sub.muestra.fecha
+        referencia = referencia_por_fecha.get(fecha) if fecha is not None else None
+        if referencia is not None:
+            base = referencia
+            clave = ("fecha", fecha)
+            caso = "referencia_fecha"
+        else:
+            base = hora_dia if sub.condicion_luz == "dia" else hora_noche
+            clave = ("muestra", sub.muestra_id, base)
+            caso = "hora_base"
         indice = contador.get(clave, 0)
         contador[clave] = indice + 1
         valor_nuevo = (datetime.combine(datetime.min, base) + timedelta(minutes=incremento * indice)).time()
@@ -52,22 +74,93 @@ def _candidatos_hora_submuestra_co2(parametros):
             "objeto": sub,
             "valor_nuevo": valor_nuevo,
             "contexto": {
+                "caso": caso,
                 "muestra_id": sub.muestra_id,
                 "n_toma": sub.n_toma,
-                "fecha": sub.muestra.fecha.isoformat() if sub.muestra.fecha else None,
+                "fecha": fecha.isoformat() if fecha else None,
                 "condicion_luz": sub.get_condicion_luz_display(),
             },
         })
     return candidatos
 
 
+CASOS_ETIQUETAS = {
+    "referencia_fecha": "Con hora de referencia en la misma fecha",
+    "hora_base": "Sin referencia — usa la hora base por condición de luz",
+}
+
+
+def _agrupar_por_caso(candidatos):
+    """Agrupa candidatos en secciones según `contexto['caso']`, conservando
+    el orden de aparición y contando cuántos hay en cada una."""
+    grupos = {}
+    orden = []
+    for c in candidatos:
+        clave = c["contexto"].get("caso", "general")
+        if clave not in grupos:
+            grupos[clave] = []
+            orden.append(clave)
+        grupos[clave].append(c)
+    return [
+        {
+            "clave": clave,
+            "etiqueta": CASOS_ETIQUETAS.get(clave, clave),
+            "cantidad": len(grupos[clave]),
+            "ejemplo": [
+                {"objeto_id": c["objeto"].pk, "valor_nuevo": str(c["valor_nuevo"]), "contexto": c["contexto"]}
+                for c in grupos[clave][:5]
+            ],
+        }
+        for clave in orden
+    ]
+
+
+def _validar_hora_submuestra_co2():
+    """Rango (mín/máx) de `hora` ya asignada en SubmuestraCO2, agrupado por
+    condición de luz, más un histograma por hora del día (0-23). Sirve para
+    detectar a simple vista horas fuera de lo esperado (p. ej. una toma
+    'noche' con hora de mediodía)."""
+    etiquetas = dict(SubmuestraCO2.CONDICION_LUZ_CHOICES)
+    base = SubmuestraCO2.objects.exclude(condicion_luz="").filter(hora__isnull=False)
+
+    resumen = (
+        base
+        .values("condicion_luz")
+        .annotate(cantidad=Count("id"), hora_min=Min("hora"), hora_max=Max("hora"))
+        .order_by("condicion_luz")
+    )
+    conteo_horas = (
+        base
+        .annotate(hora_del_dia=ExtractHour("hora"))
+        .values("condicion_luz", "hora_del_dia")
+        .annotate(cantidad=Count("id"))
+    )
+    histogramas = {}
+    for fila in conteo_horas:
+        histogramas.setdefault(fila["condicion_luz"], {})[fila["hora_del_dia"]] = fila["cantidad"]
+
+    return [
+        {
+            "condicion_luz": fila["condicion_luz"],
+            "etiqueta": etiquetas.get(fila["condicion_luz"], fila["condicion_luz"]),
+            "cantidad": fila["cantidad"],
+            "hora_min": fila["hora_min"].strftime("%H:%M") if fila["hora_min"] else None,
+            "hora_max": fila["hora_max"].strftime("%H:%M") if fila["hora_max"] else None,
+            "histograma": [histogramas.get(fila["condicion_luz"], {}).get(h, 0) for h in range(24)],
+        }
+        for fila in resumen
+    ]
+
+
 REGLAS = {
     "hora_submuestra_co2": {
         "nombre": "Hora de toma faltante",
         "descripcion": (
-            "Si condición de luz es 'día' usa la hora base de día (mediodía por defecto), si es 'noche' o "
-            "'noche simulada' usa la hora base de noche (medianoche por defecto). Entre tomas de la misma "
-            "muestra que compartan esa base, suma el incremento configurado por cada una para no repetir la hora."
+            "Si ya hay una toma con hora conocida en la misma fecha, esa hora se usa como referencia para "
+            "todas las tomas sin hora de ese día. Si no hay ninguna referencia para la fecha, se usa la hora "
+            "base de día (mediodía por defecto) o de noche/noche simulada (medianoche por defecto) según la "
+            "condición de luz. Entre tomas que comparten la misma base, suma el incremento configurado por "
+            "cada una para no repetir la hora."
         ),
         "modelo_destino": "SubmuestraCO2",
         "campo_destino": "hora",
@@ -78,6 +171,7 @@ REGLAS = {
             {"clave": "incremento_minutos", "etiqueta": "Incremento entre tomas de la misma muestra (minutos)", "tipo": "number"},
         ],
         "calcular_candidatos": _candidatos_hora_submuestra_co2,
+        "validar_valores": _validar_hora_submuestra_co2,
     },
 }
 
@@ -102,6 +196,7 @@ def listar_reglas():
             "modelo_destino": config["modelo_destino"],
             "campo_destino": config["campo_destino"],
             "pendientes": len(candidatos),
+            "tiene_validacion": bool(config.get("validar_valores")),
         })
     return resultado
 
@@ -123,6 +218,8 @@ def detalle_regla(codigo):
             {"objeto_id": c["objeto"].pk, "valor_nuevo": str(c["valor_nuevo"]), "contexto": c["contexto"]}
             for c in candidatos[:5]
         ],
+        "casos": _agrupar_por_caso(candidatos),
+        "validacion": config["validar_valores"]() if config.get("validar_valores") else None,
         "historial": historial_regla(codigo),
     }
 

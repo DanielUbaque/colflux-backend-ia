@@ -237,7 +237,7 @@
       const tienePendientes = regla.pendientes > 0;
       return `<th>
         <button type="button" class="btn-validacion" title="${escapeHtml(regla.nombre)}"
-          data-ver-regla="${regla.codigo}" data-con-pendientes="${tienePendientes}">
+          data-ver-campo="${escapeHtml(c.clave)}" data-con-pendientes="${tienePendientes}">
           🛡️ Validación${tienePendientes ? `<span class="badge-pendientes">${regla.pendientes}</span>` : ''}
         </button>
       </th>`;
@@ -292,10 +292,10 @@
       cargarDatos();
     });
 
-    contenido.querySelectorAll('[data-ver-regla]').forEach(btn => {
+    contenido.querySelectorAll('[data-ver-campo]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const qs = new URLSearchParams({ codigo: btn.dataset.verRegla, fuente: fuenteId || '', carga: cargaId || '' });
-        window.location.href = `regla-detalle.html?${qs}`;
+        const qs = new URLSearchParams({ campo: btn.dataset.verCampo, fuente: fuenteId || '', carga: cargaId || '' });
+        window.location.href = `reglas-campo.html?${qs}`;
       });
     });
   }

@@ -65,6 +65,10 @@
 
     .pendientes-badge { display: inline-block; background: var(--amber-l); color: #92400e; border-radius: 20px; padding: 4px 12px; font-size: .8rem; font-weight: 700; }
 
+    .caso-seccion { margin-top: 20px; }
+    .caso-seccion:first-child { margin-top: 0; }
+    .caso-seccion h3 { display: flex; align-items: center; gap: 10px; font-size: .9rem; font-weight: 700; margin-bottom: 8px; }
+
     footer { background: #0d1117; color: rgba(255,255,255,.5); padding: 28px 0; font-size: .82rem; margin-top: 40px; }
   </style>
 </head>
@@ -108,9 +112,11 @@
   }
 
   function volverUrl() {
-    if (!fuenteId || !cargaId) return null;
-    const qs = new URLSearchParams({ fuente: fuenteId, carga: cargaId });
-    return `etl-datos.html?${qs}`;
+    if (!state.detalle) return null;
+    const qs = new URLSearchParams({ campo: `${state.detalle.modelo_destino}.${state.detalle.campo_destino}` });
+    if (fuenteId) qs.set('fuente', fuenteId);
+    if (cargaId) qs.set('carga', cargaId);
+    return `reglas-campo.html?${qs}`;
   }
 
   function render() {
@@ -136,12 +142,35 @@
       </div>
     `).join('');
 
-    const ejemploFilas = d.ejemplo.map(e => `
-      <tr>
-        <td>#${e.objeto_id}</td>
-        <td>${escapeHtml(JSON.stringify(e.contexto))}</td>
-        <td><strong>${escapeHtml(e.valor_nuevo)}</strong></td>
-      </tr>
+    function contextoLegible(contexto) {
+      const { caso, ...resto } = contexto;
+      return Object.entries(resto).map(([k, v]) => `${k}: ${v ?? '—'}`).join(' · ');
+    }
+
+    function validacionUrl() {
+      const qs = new URLSearchParams({ codigo });
+      if (fuenteId) qs.set('fuente', fuenteId);
+      if (cargaId) qs.set('carga', cargaId);
+      return `regla-validacion.html?${qs}`;
+    }
+
+    const casosSecciones = (d.casos || []).map(caso => `
+      <div class="caso-seccion">
+        <h3>${escapeHtml(caso.etiqueta)} <span class="pendientes-badge">${caso.cantidad}</span></h3>
+        <table class="ejemplo-tabla">
+          <thead><tr><th>Registro</th><th>Contexto</th><th>Valor propuesto</th></tr></thead>
+          <tbody>
+            ${caso.ejemplo.map(e => `
+              <tr>
+                <td>#${e.objeto_id}</td>
+                <td>${escapeHtml(contextoLegible(e.contexto))}</td>
+                <td><strong>${escapeHtml(e.valor_nuevo)}</strong></td>
+              </tr>
+            `).join('') || '<tr><td colspan="3">Sin ejemplos.</td></tr>'}
+          </tbody>
+        </table>
+        ${caso.cantidad > caso.ejemplo.length ? `<p class="descripcion">Mostrando ${caso.ejemplo.length} de ${caso.cantidad} de este caso.</p>` : ''}
+      </div>
     `).join('');
 
     const volver = volverUrl();
@@ -163,12 +192,15 @@
       </div>
 
       <div class="card">
-        <h2>Ejemplo con los parámetros actuales</h2>
-        <p class="descripcion">Vista previa de los primeros ${d.ejemplo.length} de ${d.pendientes} registros pendientes.</p>
-        <table class="ejemplo-tabla">
-          <thead><tr><th>Registro</th><th>Contexto</th><th>Valor propuesto</th></tr></thead>
-          <tbody>${ejemploFilas || '<tr><td colspan="3">No hay pendientes.</td></tr>'}</tbody>
-        </table>
+        <h2>Ejemplo con los parámetros actuales, por caso</h2>
+        <p class="descripcion">Los ${d.pendientes} registros pendientes se agrupan según qué condición de la regla les aplica.</p>
+        ${casosSecciones || '<p class="descripcion">No hay pendientes.</p>'}
+      </div>
+
+      <div class="card">
+        <h2>Validación de valores — hora de la toma</h2>
+        <p class="descripcion">Explora el rango y la distribución por hora del día de <code>SubmuestraCO2.hora</code>, agrupado por condición de luz, con gráficas para detectar tomas mal clasificadas.</p>
+        <a class="btn-secondary" href="${validacionUrl()}">📊 Ver validación de rangos →</a>
       </div>
 
       <div class="card">
@@ -218,7 +250,7 @@
         ` : '<p class="descripcion">Todavía no se ha aplicado esta regla.</p>'}
       </div>
 
-      ${volver ? `<a class="btn-secondary" href="${volver}">← Volver a los datos de la carga</a>` : ''}
+      ${volver ? `<a class="btn-secondary" href="${volver}">← Volver a las reglas del atributo</a>` : ''}
     `;
 
     document.getElementById('btnGuardar')?.addEventListener('click', guardarParametros);
