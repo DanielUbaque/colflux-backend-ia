@@ -70,15 +70,31 @@ class MuestraAmbiental(TimestampedModel):
         ("Pool", "Pool (charcos / sobre agua)"),
         ("Lawns", "Lawns (lugares planos)"),
     ]
+    MOMENTO_CHOICES = [
+        ("inicio", "Inicio"),
+        ("final", "Final"),
+    ]
 
     fecha = models.DateField("fecha", null=True, blank=True)
     hora = models.TimeField("hora", null=True, blank=True)
+    # Cuando la fuente reporta un rango (p. ej. lectura al inicio y al final
+    # de la toma) en vez de un único valor, cada lectura se guarda como su
+    # propia muestra ambiental distinguida por este campo. Queda opcional:
+    # si la fuente ya trae un único valor, se deja vacío. El agrupado/
+    # promedio de inicio+final (cuando se necesite) es un procedimiento aparte.
+    momento = models.CharField("momento", max_length=10, choices=MOMENTO_CHOICES, blank=True)
     soil_temp = models.DecimalField("temperatura del suelo (°C)", max_digits=6, decimal_places=2, null=True, blank=True)
     air_temp = models.DecimalField("temperatura del aire (°C)", max_digits=6, decimal_places=2, null=True, blank=True)
     atm_press = models.DecimalField("presión atmosférica (hPa)", max_digits=8, decimal_places=2, null=True, blank=True)
     relat_humid = models.DecimalField("humedad relativa (%)", max_digits=5, decimal_places=2, null=True, blank=True)
     dew_point = models.DecimalField("punto de rocío (°C)", max_digits=6, decimal_places=2, null=True, blank=True)
     microtopo = models.CharField("microtopografía", max_length=10, choices=MICROTOPO_CHOICES, blank=True)
+    # Permite cargar clima de forma independiente de una MuestraCO2 (p. ej.
+    # un archivo de estación meteorológica), ubicándolo en el espacio.
+    unidad_muestreo = models.ForeignKey(
+        UnidadMuestreo, on_delete=models.PROTECT, related_name="muestras_ambientales",
+        null=True, blank=True, verbose_name="unidad de muestreo",
+    )
 
     class Meta:
         verbose_name = "muestra ambiental"

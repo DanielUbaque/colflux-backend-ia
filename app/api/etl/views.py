@@ -1,4 +1,5 @@
 import csv
+import decimal
 import io
 import json
 import math
@@ -15,7 +16,7 @@ from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from app.models import CargaArchivo, FuenteDatos, MapeoColumna
+from app.models import CargaArchivo, FuenteDatos, MapeoColumna, Proyecto
 
 from app.catalogo.generator import GRUPOS_CATALOGO, campo_to_catalogo, fk_choices
 
@@ -70,6 +71,20 @@ for _grupo in GRUPOS_CATALOGO:
             "nombre": "Sitio",
             "icono": "📍",
             "entidades": ["Sitio"],
+        })
+        # Clima (MuestraAmbiental) se saca de "Muestras CO₂" para poder
+        # cargarse solo, sin depender de tener también datos de CO₂ en el
+        # mismo archivo — solo necesita que ya exista la Unidad de Muestreo
+        # a la que se va a vincular, por eso va justo después de "Sitio".
+        SECCIONES_ETL.append({
+            "nombre": "Clima",
+            "icono": "🌦️",
+            "entidades": ["MuestraAmbiental"],
+        })
+    elif _grupo["nombre"] == "Muestras CO₂":
+        SECCIONES_ETL.append({
+            **_grupo,
+            "entidades": [e for e in _grupo["entidades"] if e != "MuestraAmbiental"],
         })
     else:
         SECCIONES_ETL.append(_grupo)
@@ -368,6 +383,7 @@ def upload_archivo(request, fuente_id):
                     modelo_destino=m.modelo_destino,
                     campo_destino=m.campo_destino,
                     transformacion=m.transformacion,
+                    regex_patron=m.regex_patron,
                     mapeo_valores=m.mapeo_valores,
                     valor_constante=m.valor_constante,
                     estrategia_nulos=m.estrategia_nulos,
@@ -381,6 +397,7 @@ def upload_archivo(request, fuente_id):
                     "modelo_destino": m.modelo_destino,
                     "campo_destino": m.campo_destino,
                     "transformacion": m.transformacion,
+                    "regex_patron": m.regex_patron,
                     "mapeo_valores": m.mapeo_valores,
                     "valor_constante": m.valor_constante,
                     "estrategia_nulos": m.estrategia_nulos,
@@ -405,6 +422,15 @@ def upload_archivo(request, fuente_id):
 
 
 def campos_destino(request):
+    proyecto = None
+    fuente_id = request.GET.get("fuente")
+    if fuente_id:
+        proyecto = (
+            FuenteDatos.objects.filter(pk=fuente_id)
+            .values_list("proyecto_id", flat=True)
+            .first()
+        )
+
     modelos = {}
     grupos = {}
     orden_modelo = 0
@@ -420,7 +446,7 @@ def campos_destino(request):
                     continue
                 if field.name in ("id", "created_at", "updated_at"):
                     continue
-                campos.append(campo_to_catalogo(field))
+                campos.append(campo_to_catalogo(field, proyecto=proyecto))
             if campos:
                 modelos[nombre] = campos
                 grupos[nombre] = {
@@ -444,7 +470,7 @@ def mapeo_carga(request, fuente_id, carga_id):
         mapeos = list(
             carga.mapeos.values(
                 "columna_origen", "modelo_destino", "campo_destino",
-                "transformacion", "mapeo_valores", "valor_constante",
+                "transformacion", "regex_patron", "mapeo_valores", "valor_constante",
                 "estrategia_nulos", "valor_relleno_manual",
             )
         )
@@ -478,18 +504,25 @@ def mapeo_carga(request, fuente_id, carga_id):
 
         try:
             guardados = 0
+            # Clave (columna_origen, modelo_destino, campo_destino): una misma
+            # columna origen puede mapear a más de un destino (p. ej. "ID" como
+            # nombre de UnidadExperimental vía regex, y completo como nombre de
+            # UnidadMuestreo), así que ya no alcanza con columna_origen sola.
             enviados = set()
             for item in items:
                 columna_origen = (item.get("columna_origen") or "").strip()
                 if not columna_origen:
                     continue
+                modelo_destino = item.get("modelo_destino", "")
+                campo_destino = item.get("campo_destino", "")
                 MapeoColumna.objects.update_or_create(
                     carga=carga,
                     columna_origen=columna_origen,
+                    modelo_destino=modelo_destino,
+                    campo_destino=campo_destino,
                     defaults={
-                        "modelo_destino": item.get("modelo_destino", ""),
-                        "campo_destino": item.get("campo_destino", ""),
                         "transformacion": item.get("transformacion", "directo"),
+                        "regex_patron": item.get("regex_patron", ""),
                         "mapeo_valores": item.get("mapeo_valores") or {},
                         "valor_constante": item.get("valor_constante", ""),
                         "estrategia_nulos": item.get("estrategia_nulos")
@@ -498,13 +531,19 @@ def mapeo_carga(request, fuente_id, carga_id):
                         "valor_relleno_manual": item.get("valor_relleno_manual", ""),
                     },
                 )
-                enviados.add(columna_origen)
+                enviados.add((columna_origen, modelo_destino, campo_destino))
                 guardados += 1
 
             # El frontend siempre envía el estado completo (columnas + atributos
             # manuales): lo que ya no venga se elimina (p. ej. un atributo manual
-            # que se quitó o se re-apuntó a otro campo).
-            carga.mapeos.exclude(columna_origen__in=enviados).delete()
+            # que se quitó o se re-apuntó a otro campo, o un destino extra removido).
+            claves_actuales = set(
+                carga.mapeos.values_list("columna_origen", "modelo_destino", "campo_destino")
+            )
+            for columna, modelo, campo in claves_actuales - enviados:
+                carga.mapeos.filter(
+                    columna_origen=columna, modelo_destino=modelo, campo_destino=campo,
+                ).delete()
 
             if not parcial:
                 carga.estado = "mapeado"
@@ -604,10 +643,24 @@ def _aplicar_estrategia_nulos(df, mapeos):
 
 
 def _resolver_valor_columna(val, mapeo):
-    """Aplica la traducción de mapeo_valores (origen -> destino) de una columna
-    mapeada a un campo con choices, igual que hace la UI antes de guardar."""
+    """Aplica la transformación de la columna (regex) y/o la traducción de
+    mapeo_valores (origen -> destino) de una columna mapeada a un campo con
+    choices, igual que hace la UI antes de guardar."""
     if _es_vacio(val):
         return None
+    if mapeo.transformacion == "regex" and mapeo.regex_patron:
+        try:
+            match = re.search(mapeo.regex_patron, str(val))
+        except re.error as exc:
+            # Python (a diferencia de JS, que se usa en la vista previa del
+            # frontend) exige que los lookbehind sean de ancho fijo, entre
+            # otras restricciones propias de su motor de regex.
+            raise ValueError(
+                f'El patrón regex de la columna "{mapeo.columna_origen}" no es válido para Python: {exc}'
+            ) from exc
+        if not match:
+            return None
+        val = match.group(1) if match.lastindex else match.group(0)
     if mapeo.mapeo_valores:
         return mapeo.mapeo_valores.get(str(val), val)
     return val
@@ -850,6 +903,37 @@ def _validar_obligatorios_unidad_muestreo(mapeos, modelos_incluidos, total_filas
     }
 
 
+def _validar_obligatorios_unidad_experimental(mapeos, modelos_incluidos, total_filas):
+    """'nombre' es obligatorio para toda unidad experimental (es, junto con
+    'proyecto', su clave de unicidad). Si no queda mapeado, get_or_create()
+    terminaría buscando solo por 'proyecto' y podría devolver más de una
+    fila cuando el proyecto ya tiene varias unidades experimentales."""
+    if "UnidadExperimental" not in modelos_incluidos:
+        return None
+
+    campos_ue = {m.campo_destino for m in mapeos if m.modelo_destino == "UnidadExperimental"}
+    errores = []
+
+    if "nombre" not in campos_ue:
+        errores.append({
+            "fila": None, "valor": None, "tipo": "campo_obligatorio_sin_mapear",
+            "mensaje": (
+                "El campo 'nombre' de Unidad Experimental no está mapeado (ni por "
+                "columna ni como atributo manual). Es obligatorio: identifica a la "
+                "unidad experimental dentro de su proyecto."
+            ),
+        })
+
+    return {
+        "columna": "Unidad Experimental (campos obligatorios)",
+        "modelo_destino": "UnidadExperimental",
+        "campo_destino": "",
+        "total": total_filas,
+        "ok": 0 if errores else total_filas,
+        "errores": errores,
+    }
+
+
 def _validar_unicidad_unidad_experimental(carga, df):
     """Unidad Experimental es única por (proyecto, nombre): la fuente debe
     tener un proyecto asociado, y si ese nombre ya existe en el proyecto con
@@ -888,9 +972,14 @@ def _validar_unicidad_unidad_experimental(carga, df):
             existente = UnidadExperimental.objects.filter(proyecto=proyecto, nombre=nombre).first()
             if existente is not None:
                 for campo, valor in valores.items():
-                    if campo == "nombre" or valor is None:
+                    # 'nombre' y 'proyecto' ya están garantizados por el filtro
+                    # de arriba; compararlos de nuevo aquí siempre "coincide".
+                    if campo in ("nombre", "proyecto") or valor is None:
                         continue
-                    if str(getattr(existente, campo)) != str(valor):
+                    valor_existente = getattr(existente, campo)
+                    if _es_fk(UnidadExperimental._meta.get_field(campo)):
+                        valor_existente = getattr(valor_existente, "pk", None)
+                    if str(valor_existente) != str(valor):
                         errores.append({
                             "fila": fila, "valor": nombre, "tipo": "conflicto_unicidad",
                             "mensaje": (
@@ -954,6 +1043,12 @@ def validar_carga(request, fuente_id, carga_id):
             resultados.append(resultado_ue)
 
         modelos_incluidos = {m.modelo_destino for m in mapeos}
+        resultado_ue_obl = _validar_obligatorios_unidad_experimental(mapeos, modelos_incluidos, carga.total_filas)
+        if resultado_ue_obl is not None:
+            for e in resultado_ue_obl["errores"]:
+                filas_con_error.add(e["fila"])
+            resultados.append(resultado_ue_obl)
+
         resultado_um = _validar_obligatorios_unidad_muestreo(mapeos, modelos_incluidos, carga.total_filas)
         if resultado_um is not None:
             for e in resultado_um["errores"]:
@@ -1032,8 +1127,20 @@ def _orden_topologico(modelos):
 
 def _coercionar_valor(valor, field):
     tipo_campo = type(field).__name__
-    if tipo_campo in ("FloatField", "DecimalField"):
+    if tipo_campo == "FloatField":
         return float(valor)
+    if tipo_campo == "DecimalField":
+        # Decimal(str(valor)), no float(valor): dejar esto en float (como
+        # antes) rompe cualquier cuenta que el modelo haga con Decimal más
+        # adelante -p. ej. Parcela._calcular_area(), que multiplica por
+        # Decimal("3.14159265") y no acepta operar con float-. Pasar por str()
+        # en vez de Decimal(valor) directo evita además la imprecisión
+        # binaria de construir un Decimal desde un float (Decimal(45.1) ->
+        # 45.09999999999999857891452847979962825775146484375).
+        try:
+            return decimal.Decimal(str(valor))
+        except decimal.InvalidOperation:
+            return decimal.Decimal(str(float(valor)))
     if tipo_campo in ("IntegerField", "PositiveIntegerField", "PositiveSmallIntegerField",
                       "SmallIntegerField", "BigIntegerField"):
         return int(float(valor))
@@ -1218,6 +1325,12 @@ def _validar_seccion(carga, df, mapeos):
         resultados.append(resultado_ue)
 
     modelos_incluidos = {m.modelo_destino for m in mapeos}
+    resultado_ue_obl = _validar_obligatorios_unidad_experimental(mapeos, modelos_incluidos, carga.total_filas)
+    if resultado_ue_obl is not None:
+        for e in resultado_ue_obl["errores"]:
+            filas_con_error.add(e["fila"])
+        resultados.append(resultado_ue_obl)
+
     resultado_um = _validar_obligatorios_unidad_muestreo(mapeos, modelos_incluidos, carga.total_filas)
     if resultado_um is not None:
         for e in resultado_um["errores"]:
@@ -1437,7 +1550,18 @@ _VISTAS_DESNORMALIZADAS = {
         "cadena": [
             ("UnidadMuestreo", []),
             ("UnidadExperimental", ["unidad_experimental"]),
+            ("UnidadMuestreoTipo", ["unidad_experimental", "tipo"]),
             ("Sitio", ["sitio"]),
+        ],
+    },
+    "clima": {
+        "modelo_base": "MuestraAmbiental",
+        "orden": ["fecha", "hora"],
+        "cadena": [
+            ("MuestraAmbiental", []),
+            ("UnidadMuestreo", ["unidad_muestreo"]),
+            ("UnidadExperimental", ["unidad_muestreo", "unidad_experimental"]),
+            ("Sitio", ["unidad_muestreo", "sitio"]),
         ],
     },
 }
@@ -1484,10 +1608,36 @@ def _preparar_vista_carga(carga, nombre_vista, filtros_raw):
     if vista is None:
         return None, None, None, f"Vista desconocida: {nombre_vista}"
 
+    pks = (carga.pks_importados or {}).get(vista["modelo_base"], [])
+    return _preparar_vista_pks(pks, nombre_vista, filtros_raw)
+
+
+def _preparar_vista_proyecto(proyecto_id, nombre_vista, filtros_raw):
+    """Igual que `_preparar_vista_carga`, pero agrega los pks importados de
+    TODAS las cargas ya importadas de las fuentes del proyecto, para poder
+    ver en una sola tabla los datos de varios archivos/fuentes distintos."""
+    vista = _VISTAS_DESNORMALIZADAS.get(nombre_vista)
+    if vista is None:
+        return None, None, None, f"Vista desconocida: {nombre_vista}"
+
+    pks = set()
+    cargas = CargaArchivo.objects.filter(fuente__proyecto_id=proyecto_id, estado="importado")
+    for carga in cargas:
+        pks.update((carga.pks_importados or {}).get(vista["modelo_base"], []))
+
+    return _preparar_vista_pks(sorted(pks), nombre_vista, filtros_raw)
+
+
+def _preparar_vista_pks(pks, nombre_vista, filtros_raw):
+    """Resuelve vista + queryset filtrado/ordenado a partir de una lista de
+    pks del modelo base ya calculada (por una carga o por un proyecto)."""
+    vista = _VISTAS_DESNORMALIZADAS.get(nombre_vista)
+    if vista is None:
+        return None, None, None, f"Vista desconocida: {nombre_vista}"
+
     cadena = vista["cadena"]
     modelo_base = vista["modelo_base"]
 
-    pks = (carga.pks_importados or {}).get(modelo_base, [])
     if not pks:
         return vista, None, None, None
 
@@ -1530,21 +1680,11 @@ def _fila_desde_objeto(obj, cadena):
     return fila
 
 
-def datos_carga(request, fuente_id, carga_id):
-    try:
-        carga = CargaArchivo.objects.get(pk=carga_id, fuente_id=fuente_id)
-    except CargaArchivo.DoesNotExist:
-        return JsonResponse({"error": "Carga no encontrada"}, status=404)
-
-    nombre_vista = request.GET.get("vista", "submuestra_co2")
-    vista, columnas, qs, error = _preparar_vista_carga(carga, nombre_vista, request.GET.get("filtros"))
-    if error:
-        return JsonResponse({"error": error}, status=400)
-
+def _respuesta_datos_vista(request, vista, columnas, qs, advertencia_sin_datos):
     if qs is None:
         return JsonResponse({
             "total": 0, "columnas": [], "filas": [], "vistas": list(_VISTAS_DESNORMALIZADAS.keys()),
-            "advertencia": f"Esta carga todavía no tiene {vista['modelo_base']} importado.",
+            "advertencia": advertencia_sin_datos,
         }, json_dumps_params={"ensure_ascii": False})
 
     try:
@@ -1570,9 +1710,42 @@ def datos_carga(request, fuente_id, carga_id):
     }, json_dumps_params={"ensure_ascii": False})
 
 
+def datos_carga(request, fuente_id, carga_id):
+    try:
+        carga = CargaArchivo.objects.get(pk=carga_id, fuente_id=fuente_id)
+    except CargaArchivo.DoesNotExist:
+        return JsonResponse({"error": "Carga no encontrada"}, status=404)
+
+    nombre_vista = request.GET.get("vista", "submuestra_co2")
+    vista, columnas, qs, error = _preparar_vista_carga(carga, nombre_vista, request.GET.get("filtros"))
+    if error:
+        return JsonResponse({"error": error}, status=400)
+
+    return _respuesta_datos_vista(
+        request, vista, columnas, qs,
+        f"Esta carga todavía no tiene {vista['modelo_base']} importado.",
+    )
+
+
+def datos_proyecto(request, proyecto_id):
+    if not Proyecto.objects.filter(pk=proyecto_id).exists():
+        return JsonResponse({"error": "Proyecto no encontrado"}, status=404)
+
+    nombre_vista = request.GET.get("vista", "submuestra_co2")
+    vista, columnas, qs, error = _preparar_vista_proyecto(proyecto_id, nombre_vista, request.GET.get("filtros"))
+    if error:
+        return JsonResponse({"error": error}, status=400)
+
+    return _respuesta_datos_vista(
+        request, vista, columnas, qs,
+        f"Este proyecto todavía no tiene {vista['modelo_base']} importado.",
+    )
+
+
 _NOMBRES_HOJA_VISTA = {
     "submuestra_co2": "Muestras CO2 (detalle)",
     "unidad_muestreo": "Unidad Muestreo-Experimental",
+    "clima": "Clima",
 }
 
 

@@ -70,8 +70,10 @@ class UnidadMuestreoTipoAdmin(admin.ModelAdmin):
 
 @admin.register(UnidadExperimental)
 class UnidadExperimentalAdmin(admin.ModelAdmin):
-    list_display = ("nombre",)
+    list_display = ("nombre", "tipo", "proyecto")
+    list_filter = ("tipo",)
     search_fields = ("nombre",)
+    raw_id_fields = ("proyecto",)
 
 
 @admin.register(UnidadMuestreo)
@@ -84,7 +86,9 @@ class UnidadMuestreoAdmin(admin.ModelAdmin):
 
 @admin.register(Parcela)
 class ParcelaAdmin(admin.ModelAdmin):
-    list_display = ("pk", "unidad_muestreo", "medida_largo", "medida_ancho", "area")
+    list_display = ("pk", "unidad_muestreo", "forma", "medida_largo", "medida_ancho", "distancia", "diametro", "area")
+    list_filter = ("forma",)
+    readonly_fields = ("area",)
     raw_id_fields = ("unidad_muestreo",)
 
 

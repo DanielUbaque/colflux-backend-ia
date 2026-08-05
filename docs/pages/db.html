@@ -128,6 +128,65 @@
     .footer-links { display: flex; gap: 20px; }
 
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Catálogo de campos ── */
+    .catalogo-layout { display: grid; grid-template-columns: 260px 1fr; gap: 24px; align-items: start; }
+    @media (max-width: 800px) { .catalogo-layout { grid-template-columns: 1fr; } }
+    .catalogo-sidebar { position: sticky; top: 90px; max-height: calc(100vh - 110px); overflow-y: auto; }
+    .sidebar-grupo { margin-bottom: 18px; }
+    .sidebar-grupo-titulo { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--gray); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+    .sidebar-entidad { display:block; width:100%; text-align:left; background:none; border:none; border-radius:8px; padding:7px 12px; font-size:.84rem; font-family:inherit; cursor:pointer; color:#374151; transition:all .15s; }
+    .sidebar-entidad:hover { background:var(--gray-l); }
+    .sidebar-entidad.active { background:var(--green-l); color:var(--green-d); font-weight:700; }
+
+    .catalogo-header { margin-bottom:20px; }
+    .catalogo-header h3 { font-size:1.3rem; font-weight:800; }
+    .catalogo-header p { font-size:.85rem; color:var(--gray); margin-top:4px; }
+    .catalogo-descripcion { font-size:.88rem; color:#374151; margin-top:10px; background:var(--green-l); border-left:3px solid var(--green); border-radius:0 8px 8px 0; padding:10px 14px; }
+
+    .campo-table { width:100%; border-collapse:collapse; background:white; border:1.5px solid var(--border); border-radius:12px; overflow:hidden; }
+    .campo-table th { background:var(--gray-l); padding:10px 14px; text-align:left; font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--gray); border-bottom:1px solid var(--border); }
+    .campo-table td { padding:10px 14px; border-bottom:1px solid var(--border); font-size:.84rem; vertical-align:top; }
+    .campo-table tr:last-child td { border-bottom:none; }
+    .campo-table tr:hover td { background:var(--gray-l); }
+
+    .campo-nombre { font-family:'JetBrains Mono',monospace; font-size:.8rem; color:var(--green-d); font-weight:600; display:flex; align-items:center; gap:6px; }
+    .btn-copy { background:none; border:1px solid var(--border); border-radius:4px; padding:2px 6px; font-size:.7rem; cursor:pointer; color:var(--gray); display:none; }
+    tr:hover .btn-copy { display:inline; }
+    .btn-copy:hover { background:var(--green-l); color:var(--green-d); border-color:var(--green); }
+
+    .tipo-badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:.72rem; font-weight:700; }
+    .tipo-Texto,.tipo-TextoLargo { background:#dcfce7; color:#166534; }
+    .tipo-Decimal,.tipo-Entero { background:var(--blue-l); color:#1e40af; }
+    .tipo-Fecha,.tipo-FechaHora { background:var(--purple-l); color:var(--purple); }
+    .tipo-Booleano { background:var(--amber-l); color:#92400e; }
+    .tipo-FK { background:var(--gray-l); color:#374151; }
+    .tipo-URL,.tipo-Correo { background:var(--blue-l); color:#1e40af; }
+
+    .req-check { color:var(--green-d); font-weight:700; }
+
+    .choices-toggle { background:none; border:1px solid var(--border); border-radius:4px; padding:2px 8px; font-size:.72rem; cursor:pointer; color:var(--gray); }
+    .choices-toggle:hover { border-color:var(--green); color:var(--green-d); }
+    .choices-list { margin-top:6px; display:none; flex-wrap:wrap; gap:4px; }
+    .choices-list.open { display:flex; }
+
+    .semilla-section { margin-top: 28px; }
+    .semilla-title { display: flex; align-items: center; gap: 8px; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--gray); margin-bottom: 10px; }
+    .semilla-title::before { content: ''; display: block; width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+    .semilla-table { width: 100%; border-collapse: collapse; background: white; border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; font-size: .82rem; }
+    .semilla-table th { background: #f0fdf4; padding: 8px 14px; text-align: left; font-size: .73rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--green-d); border-bottom: 1px solid var(--border); }
+    .semilla-table td { padding: 8px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .semilla-table tr:last-child td { border-bottom: none; }
+    .semilla-table tr:hover td { background: var(--gray-l); }
+    .choice-tag { background:var(--gray-l); border-radius:4px; padding:2px 8px; font-size:.72rem; color:#374151; }
+
+    .catalogo-search-bar { background:white; border-bottom:1px solid var(--border); padding:14px 0; position:sticky; top:57px; z-index:90; }
+    .catalogo-search-inner { display:flex; gap:12px; align-items:center; }
+    .catalogo-search-inner input { flex:1; border:1.5px solid var(--border); border-radius:8px; padding:8px 14px; font-size:.84rem; font-family:inherit; outline:none; }
+    .catalogo-search-inner input:focus { border-color:var(--green); }
+    .catalogo-search-inner select { border:1.5px solid var(--border); border-radius:8px; padding:8px 12px; font-size:.84rem; font-family:inherit; outline:none; }
+
+    .highlight { background:#fef9c3; border-radius:3px; }
   </style>
 </head>
 <body>
@@ -143,10 +202,8 @@
       flujo de cámaras, torres EC, caracterización de suelos y publicaciones científicas.
     </p>
     <div class="hero-actions">
-      <a class="btn-primary" href="https://dbdiagram.io/d/colfux-db-67b2aae2263d6cf9a05d08d0" target="_blank">
-        🔗 Ver en dbdiagram.io
-      </a>
-      <a class="btn-secondary" href="#schema">Ver tablas</a>
+      <a class="btn-secondary" href="#erd-section">Ver diagrama</a>
+      <a class="btn-secondary" href="#catalogo">Ver catálogo de campos</a>
     </div>
     <div class="hero-stats">
       <div class="hero-stat"><strong>25</strong><span>Tablas</span></div>
@@ -207,6 +264,31 @@
     </div>
 
     <div id="explorer-content" style="display:none;"></div>
+  </div>
+</section>
+
+<!-- ── Catálogo de campos ── -->
+<section id="catalogo">
+  <div class="container">
+    <p class="section-eyebrow">Catálogo técnico</p>
+    <h2 class="stitle">Catálogo de campos</h2>
+    <p class="sdesc">Referencia de todas las entidades y campos disponibles en la base de datos. Úsala para identificar a qué atributo mapear los datos de tu archivo.</p>
+  </div>
+
+  <div class="catalogo-search-bar">
+    <div class="container">
+      <div class="catalogo-search-inner">
+        <input type="text" id="searchInput" placeholder="🔍  Buscar campo o entidad…">
+        <select id="grupoFilter"><option value="">Todos los grupos</option></select>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" style="padding-top:24px;">
+    <div class="catalogo-layout">
+      <aside class="catalogo-sidebar" id="sidebar"><!-- renderizado por JS --></aside>
+      <main id="mainPanel"><!-- renderizado por JS --></main>
+    </div>
   </div>
 </section>
 
@@ -322,6 +404,11 @@
     const center = document.createElement('div');
     const cc = centerCard(modelName);
     if (cc) center.appendChild(cc);
+    const catalogoLink = document.createElement('button');
+    catalogoLink.textContent = 'Ver en catálogo →';
+    catalogoLink.style.cssText = `margin-top:10px;width:100%;background:none;border:1.5px solid ${color};color:${color};font-weight:700;font-size:.76rem;padding:7px;border-radius:8px;cursor:pointer;`;
+    catalogoLink.addEventListener('click', () => window.selectEntidadEnCatalogo?.(modelName));
+    center.appendChild(catalogoLink);
 
     // Right — incoming FKs
     const right = document.createElement('div');
@@ -585,6 +672,188 @@
   }
 
   buildERD();
+})();
+</script>
+
+<script>
+(function () {
+  let state = { grupos: [], entidadActiva: null };
+
+  function init() {
+    if (!window.CATALOGO) {
+      document.getElementById('mainPanel').innerHTML = `
+        <div style="text-align:center;padding:60px 20px;color:var(--gray)">
+          <div style="font-size:2rem;margin-bottom:12px;">⚠️</div>
+          <h3>Catálogo no disponible</h3>
+          <p style="font-size:.85rem;margin-top:6px;">Levanta Django una vez para generar <code>catalogo.js</code>.</p>
+        </div>`;
+      return;
+    }
+    state.grupos = window.CATALOGO.grupos;
+    populateGrupoFilter();
+    renderSidebar();
+    const primera = state.grupos[0]?.entidades[0];
+    if (primera) selectEntidad(primera);
+  }
+
+  function populateGrupoFilter() {
+    const sel = document.getElementById('grupoFilter');
+    state.grupos.forEach(g => {
+      sel.innerHTML += `<option value="${g.nombre}">${g.icono} ${g.nombre}</option>`;
+    });
+  }
+
+  function renderSidebar(filtroGrupo = '', query = '') {
+    const sidebar = document.getElementById('sidebar');
+    let html = '';
+    state.grupos.forEach(grupo => {
+      if (filtroGrupo && grupo.nombre !== filtroGrupo) return;
+      const entidadesFiltradas = grupo.entidades.filter(e =>
+        !query || e.nombre.toLowerCase().includes(query) ||
+        e.verbose_name.toLowerCase().includes(query) ||
+        e.campos.some(c => c.nombre.toLowerCase().includes(query) || c.verbose_name.toLowerCase().includes(query))
+      );
+      if (!entidadesFiltradas.length) return;
+      html += `<div class="sidebar-grupo">
+        <div class="sidebar-grupo-titulo">${grupo.icono} ${grupo.nombre}</div>`;
+      entidadesFiltradas.forEach(e => {
+        const active = state.entidadActiva?.nombre === e.nombre ? 'active' : '';
+        html += `<button class="sidebar-entidad ${active}" data-entidad="${e.nombre}">${e.verbose_name || e.nombre}</button>`;
+      });
+      html += '</div>';
+    });
+    sidebar.innerHTML = html || '<p style="font-size:.82rem;color:var(--gray)">Sin resultados</p>';
+  }
+
+  function findEntidad(nombre) {
+    for (const g of state.grupos) {
+      const e = g.entidades.find(e => e.nombre === nombre);
+      if (e) return e;
+    }
+    return null;
+  }
+
+  function selectEntidad(entidad, scroll = false) {
+    state.entidadActiva = entidad;
+    renderSidebar(
+      document.getElementById('grupoFilter').value,
+      document.getElementById('searchInput').value.toLowerCase()
+    );
+    renderEntidad(entidad, document.getElementById('searchInput').value.toLowerCase());
+    if (scroll) document.getElementById('catalogo').scrollIntoView({ behavior: 'smooth' });
+  }
+  window.selectEntidadEnCatalogo = function (nombre) {
+    const e = findEntidad(nombre);
+    if (e) selectEntidad(e, true);
+  };
+
+  function tipoBadgeClass(tipo) {
+    return 'tipo-' + tipo.replace(/ /g,'');
+  }
+
+  function renderEntidad(entidad, query = '') {
+    const panel = document.getElementById('mainPanel');
+    const camposFiltrados = query
+      ? entidad.campos.filter(c =>
+          c.nombre.toLowerCase().includes(query) ||
+          c.verbose_name.toLowerCase().includes(query))
+      : entidad.campos;
+
+    const filas = camposFiltrados.map(c => {
+      const nombreHl = query ? c.nombre.replace(new RegExp(query,'gi'), m=>`<mark class="highlight">${m}</mark>`) : c.nombre;
+      const verboseHl = query ? c.verbose_name.replace(new RegExp(query,'gi'), m=>`<mark class="highlight">${m}</mark>`) : c.verbose_name;
+
+      let restricciones = '';
+      if (c.max_length) restricciones += `<span style="font-size:.75rem;color:var(--gray)">máx. ${c.max_length} chars</span>`;
+      if (c.choices?.length) {
+        const id = 'ch_' + c.nombre + '_' + entidad.nombre;
+        restricciones += `<button class="choices-toggle" onclick="toggleChoices('${id}')">▼ ${c.choices.length} opciones</button>
+          <div class="choices-list" id="${id}">
+            ${c.choices.map(ch=>`<span class="choice-tag" title="${ch.etiqueta}">${ch.valor}</span>`).join('')}
+          </div>`;
+      }
+      if (c.es_fk && c.modelo_fk) restricciones += `<span style="font-size:.75rem;color:var(--gray)">→ ${c.modelo_fk}</span>`;
+
+      return `<tr>
+        <td><div class="campo-nombre">
+          ${nombreHl}
+          <button class="btn-copy" onclick="copiar('${c.nombre}', this)" title="Copiar nombre">📋</button>
+        </div></td>
+        <td>${verboseHl}</td>
+        <td><span class="tipo-badge ${tipoBadgeClass(c.tipo)}">${c.tipo}</span></td>
+        <td style="text-align:center">${c.requerido ? '<span class="req-check">✓</span>' : ''}</td>
+        <td>${restricciones}</td>
+      </tr>`;
+    }).join('');
+
+    panel.innerHTML = `
+      <div class="catalogo-header">
+        <h3>${entidad.verbose_name || entidad.nombre}</h3>
+        <p>${entidad.verbose_name_plural} · ${camposFiltrados.length} campo${camposFiltrados.length !== 1 ? 's' : ''}${query ? ' (filtrados)' : ''}</p>
+        ${entidad.descripcion ? `<div class="catalogo-descripcion">${entidad.descripcion}</div>` : ''}
+      </div>
+      ${camposFiltrados.length === 0
+        ? '<p style="color:var(--gray);padding:40px 0;text-align:center;">Ningún campo coincide con la búsqueda</p>'
+        : `<table class="campo-table">
+            <thead><tr>
+              <th>Campo</th><th>Nombre legible</th><th>Tipo</th>
+              <th style="text-align:center">Req.</th><th>Restricciones / Opciones</th>
+            </tr></thead>
+            <tbody>${filas}</tbody>
+          </table>`
+      }
+      ${renderSemilla(entidad)}`;
+  }
+
+  function renderSemilla(entidad) {
+    if (!entidad.datos_semilla?.length) return '';
+    const rows = entidad.datos_semilla;
+    const cols = Object.keys(rows[0]);
+    const ths = cols.map(c => `<th>${c}</th>`).join('');
+    const trs = rows.map(r =>
+      `<tr>${cols.map(c => `<td>${r[c] ?? ''}</td>`).join('')}</tr>`
+    ).join('');
+    return `<div class="semilla-section">
+      <div class="semilla-title">Datos disponibles (${rows.length} registros)</div>
+      <div style="overflow-x:auto">
+        <table class="semilla-table">
+          <thead><tr>${ths}</tr></thead>
+          <tbody>${trs}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  window.toggleChoices = function (id) {
+    document.getElementById(id).classList.toggle('open');
+  };
+
+  window.copiar = function (texto, btn) {
+    navigator.clipboard.writeText(texto).then(() => {
+      btn.textContent = '✓';
+      setTimeout(() => btn.textContent = '📋', 1200);
+    });
+  };
+
+  document.getElementById('sidebar').addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-entidad]');
+    if (!btn) return;
+    const e2 = findEntidad(btn.dataset.entidad);
+    if (e2) selectEntidad(e2);
+  });
+
+  document.getElementById('searchInput').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    const grupoFiltro = document.getElementById('grupoFilter').value;
+    renderSidebar(grupoFiltro, q);
+    if (state.entidadActiva) renderEntidad(state.entidadActiva, q);
+  });
+
+  document.getElementById('grupoFilter').addEventListener('change', function() {
+    renderSidebar(this.value, document.getElementById('searchInput').value.toLowerCase());
+  });
+
+  init();
 })();
 </script>
 </body>

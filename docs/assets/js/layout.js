@@ -5,11 +5,9 @@
   const root    = inPages ? '../' : '';
 
   const NAV_LINKS = [
-    { href: `${root}index.html`,                  label: 'Plan de trabajo',  id: 'index.html' },
     { href: `${base}team.html`,                   label: 'Equipo',           id: 'team.html' },
     { href: `${base}db.html`,                     label: 'Base de datos',    id: 'db.html' },
     { href: `${base}data.html`,                   label: '📂 Datos',         id: 'data.html' },
-    { href: `${base}catalogo-tecnico.html`,       label: '📖 Catálogo',      id: 'catalogo-tecnico.html' },
   ];
 
   function navHTML() {
@@ -38,8 +36,6 @@
       <div class="footer-links">
         <a href="https://github.com/colflux/backend" target="_blank">GitHub</a>
         <a href="${base}db.html">Base de datos</a>
-        <a href="${base}catalogo-tecnico.html">Catálogo técnico</a>
-        <a href="${root}index.html">Plan de trabajo</a>
       </div>
     </div>
   </div>

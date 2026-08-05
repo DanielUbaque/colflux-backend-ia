@@ -5842,7 +5842,7 @@
           "verbose_name": "unidad de muestreo",
           "verbose_name_plural": "unidades de muestreo",
           "descripcion": "Lugar/objeto desde el cual se toma la muestra. Su tipo sale del catálogo.",
-          "total_campos": 5,
+          "total_campos": 6,
           "campos": [
             {
               "nombre": "nombre",
@@ -5896,8 +5896,40 @@
                   "etiqueta": "IDEAM"
                 },
                 {
+                  "valor": "23",
+                  "etiqueta": "S1_new"
+                },
+                {
+                  "valor": "22",
+                  "etiqueta": "S1_old"
+                },
+                {
+                  "valor": "24",
+                  "etiqueta": "S2"
+                },
+                {
+                  "valor": "17",
+                  "etiqueta": "SWAMP"
+                },
+                {
                   "valor": "3",
                   "etiqueta": "UE-manual-01"
+                },
+                {
+                  "valor": "12",
+                  "etiqueta": "calostros"
+                },
+                {
+                  "valor": "11",
+                  "etiqueta": "elcisne"
+                },
+                {
+                  "valor": "14",
+                  "etiqueta": "lagunaseca"
+                },
+                {
+                  "valor": "13",
+                  "etiqueta": "sanantonio"
                 }
               ],
               "es_fk": true,
@@ -5925,10 +5957,25 @@
                 {
                   "valor": "7",
                   "etiqueta": "CO2 (CSV)"
+                },
+                {
+                  "valor": "12",
+                  "etiqueta": "Flujos CO2 (CSV)"
                 }
               ],
               "es_fk": true,
               "modelo_fk": "FuenteDatos"
+            },
+            {
+              "nombre": "fecha_instalacion",
+              "verbose_name": "fecha instalación unidad de muestreo",
+              "tipo": "Fecha",
+              "tipo_raw": "DateField",
+              "requerido": false,
+              "max_length": null,
+              "choices": [],
+              "es_fk": false,
+              "modelo_fk": null
             }
           ]
         },
@@ -5937,7 +5984,7 @@
           "verbose_name": "unidad experimental",
           "verbose_name_plural": "unidades experimentales",
           "descripcion": "Unidad a la que se asigna/representa un tratamiento independiente. Agrupa una o varias unidades de muestreo (p. ej. un transecto dividido en puntos/plots, o varias parcelas).",
-          "total_campos": 3,
+          "total_campos": 4,
           "campos": [
             {
               "nombre": "proyecto",
@@ -5950,6 +5997,10 @@
                 {
                   "valor": "1",
                   "etiqueta": "IDEAM"
+                },
+                {
+                  "valor": "3",
+                  "etiqueta": "SWAMP"
                 }
               ],
               "es_fk": true,
@@ -5965,6 +6016,34 @@
               "choices": [],
               "es_fk": false,
               "modelo_fk": null
+            },
+            {
+              "nombre": "tipo",
+              "verbose_name": "tipo",
+              "tipo": "FK (relación)",
+              "tipo_raw": "ForeignKey",
+              "requerido": false,
+              "max_length": null,
+              "choices": [
+                {
+                  "valor": "3",
+                  "etiqueta": "conglomerado"
+                },
+                {
+                  "valor": "1",
+                  "etiqueta": "parcela"
+                },
+                {
+                  "valor": "4",
+                  "etiqueta": "plot"
+                },
+                {
+                  "valor": "2",
+                  "etiqueta": "transecto"
+                }
+              ],
+              "es_fk": true,
+              "modelo_fk": "UnidadMuestreoTipo"
             },
             {
               "nombre": "descripcion",
@@ -5983,8 +6062,8 @@
           "nombre": "Parcela",
           "verbose_name": "parcela",
           "verbose_name_plural": "parcelas",
-          "descripcion": "Detalle de una unidad de muestreo cuando su tipo es 'parcela' (dimensiones).",
-          "total_campos": 5,
+          "descripcion": "Detalle de una unidad de muestreo cuando su tipo es 'parcela' (forma y dimensiones).",
+          "total_campos": 8,
           "campos": [
             {
               "nombre": "unidad_muestreo",
@@ -5994,6 +6073,30 @@
               "requerido": false,
               "max_length": null,
               "choices": [],
+              "es_fk": false,
+              "modelo_fk": null
+            },
+            {
+              "nombre": "forma",
+              "verbose_name": "forma",
+              "tipo": "Texto",
+              "tipo_raw": "CharField",
+              "requerido": false,
+              "max_length": 15,
+              "choices": [
+                {
+                  "valor": "Cuadrada",
+                  "etiqueta": "Cuadrada"
+                },
+                {
+                  "valor": "Rectangular",
+                  "etiqueta": "Rectangular"
+                },
+                {
+                  "valor": "Circular",
+                  "etiqueta": "Circular"
+                }
+              ],
               "es_fk": false,
               "modelo_fk": null
             },
@@ -6011,6 +6114,28 @@
             {
               "nombre": "medida_ancho",
               "verbose_name": "medida ancho (m)",
+              "tipo": "Decimal",
+              "tipo_raw": "DecimalField",
+              "requerido": false,
+              "max_length": null,
+              "choices": [],
+              "es_fk": false,
+              "modelo_fk": null
+            },
+            {
+              "nombre": "distancia",
+              "verbose_name": "distancia / lado (m)",
+              "tipo": "Decimal",
+              "tipo_raw": "DecimalField",
+              "requerido": false,
+              "max_length": null,
+              "choices": [],
+              "es_fk": false,
+              "modelo_fk": null
+            },
+            {
+              "nombre": "diametro",
+              "verbose_name": "diámetro (m)",
               "tipo": "Decimal",
               "tipo_raw": "DecimalField",
               "requerido": false,
@@ -8943,7 +9068,7 @@
           "verbose_name": "muestra ambiental",
           "verbose_name_plural": "muestras ambientales",
           "descripcion": "Contexto ambiental (biomet) asociado a una muestra de CO₂.",
-          "total_campos": 8,
+          "total_campos": 10,
           "campos": [
             {
               "nombre": "fecha",
@@ -8964,6 +9089,26 @@
               "requerido": false,
               "max_length": null,
               "choices": [],
+              "es_fk": false,
+              "modelo_fk": null
+            },
+            {
+              "nombre": "momento",
+              "verbose_name": "momento",
+              "tipo": "Texto",
+              "tipo_raw": "CharField",
+              "requerido": false,
+              "max_length": 10,
+              "choices": [
+                {
+                  "valor": "inicio",
+                  "etiqueta": "Inicio"
+                },
+                {
+                  "valor": "final",
+                  "etiqueta": "Final"
+                }
+              ],
               "es_fk": false,
               "modelo_fk": null
             },
@@ -9049,6 +9194,1718 @@
               ],
               "es_fk": false,
               "modelo_fk": null
+            },
+            {
+              "nombre": "unidad_muestreo",
+              "verbose_name": "unidad de muestreo",
+              "tipo": "FK (relación)",
+              "tipo_raw": "ForeignKey",
+              "requerido": false,
+              "max_length": null,
+              "choices": [
+                {
+                  "valor": "154",
+                  "etiqueta": ""
+                },
+                {
+                  "valor": "1848",
+                  "etiqueta": "IE"
+                },
+                {
+                  "valor": "9",
+                  "etiqueta": "S1_old_3"
+                },
+                {
+                  "valor": "1706",
+                  "etiqueta": "S1_old_3"
+                },
+                {
+                  "valor": "1283",
+                  "etiqueta": "S1_old_3"
+                },
+                {
+                  "valor": "1845",
+                  "etiqueta": "calostros _8"
+                },
+                {
+                  "valor": "148",
+                  "etiqueta": "calostros _8"
+                },
+                {
+                  "valor": "1422",
+                  "etiqueta": "calostros _8"
+                },
+                {
+                  "valor": "1284",
+                  "etiqueta": "calostros_1"
+                },
+                {
+                  "valor": "10",
+                  "etiqueta": "calostros_1"
+                },
+                {
+                  "valor": "1707",
+                  "etiqueta": "calostros_1"
+                },
+                {
+                  "valor": "1819",
+                  "etiqueta": "calostros_1.1"
+                },
+                {
+                  "valor": "1396",
+                  "etiqueta": "calostros_1.1"
+                },
+                {
+                  "valor": "122",
+                  "etiqueta": "calostros_1.1"
+                },
+                {
+                  "valor": "69",
+                  "etiqueta": "calostros_10"
+                },
+                {
+                  "valor": "1343",
+                  "etiqueta": "calostros_10"
+                },
+                {
+                  "valor": "1766",
+                  "etiqueta": "calostros_10"
+                },
+                {
+                  "valor": "70",
+                  "etiqueta": "calostros_11"
+                },
+                {
+                  "valor": "1767",
+                  "etiqueta": "calostros_11"
+                },
+                {
+                  "valor": "1344",
+                  "etiqueta": "calostros_11"
+                },
+                {
+                  "valor": "1768",
+                  "etiqueta": "calostros_12"
+                },
+                {
+                  "valor": "1345",
+                  "etiqueta": "calostros_12"
+                },
+                {
+                  "valor": "71",
+                  "etiqueta": "calostros_12"
+                },
+                {
+                  "valor": "1346",
+                  "etiqueta": "calostros_13"
+                },
+                {
+                  "valor": "72",
+                  "etiqueta": "calostros_13"
+                },
+                {
+                  "valor": "1769",
+                  "etiqueta": "calostros_13"
+                },
+                {
+                  "valor": "1347",
+                  "etiqueta": "calostros_14"
+                },
+                {
+                  "valor": "1770",
+                  "etiqueta": "calostros_14"
+                },
+                {
+                  "valor": "73",
+                  "etiqueta": "calostros_14"
+                },
+                {
+                  "valor": "74",
+                  "etiqueta": "calostros_15"
+                },
+                {
+                  "valor": "1771",
+                  "etiqueta": "calostros_15"
+                },
+                {
+                  "valor": "1348",
+                  "etiqueta": "calostros_15"
+                },
+                {
+                  "valor": "1349",
+                  "etiqueta": "calostros_16"
+                },
+                {
+                  "valor": "75",
+                  "etiqueta": "calostros_16"
+                },
+                {
+                  "valor": "1772",
+                  "etiqueta": "calostros_16"
+                },
+                {
+                  "valor": "1381",
+                  "etiqueta": "calostros_17"
+                },
+                {
+                  "valor": "107",
+                  "etiqueta": "calostros_17"
+                },
+                {
+                  "valor": "1804",
+                  "etiqueta": "calostros_17"
+                },
+                {
+                  "valor": "1382",
+                  "etiqueta": "calostros_18"
+                },
+                {
+                  "valor": "108",
+                  "etiqueta": "calostros_18"
+                },
+                {
+                  "valor": "1805",
+                  "etiqueta": "calostros_18"
+                },
+                {
+                  "valor": "109",
+                  "etiqueta": "calostros_19"
+                },
+                {
+                  "valor": "1383",
+                  "etiqueta": "calostros_19"
+                },
+                {
+                  "valor": "1806",
+                  "etiqueta": "calostros_19"
+                },
+                {
+                  "valor": "1285",
+                  "etiqueta": "calostros_2"
+                },
+                {
+                  "valor": "11",
+                  "etiqueta": "calostros_2"
+                },
+                {
+                  "valor": "1708",
+                  "etiqueta": "calostros_2"
+                },
+                {
+                  "valor": "123",
+                  "etiqueta": "calostros_2.1"
+                },
+                {
+                  "valor": "1820",
+                  "etiqueta": "calostros_2.1"
+                },
+                {
+                  "valor": "1397",
+                  "etiqueta": "calostros_2.1"
+                },
+                {
+                  "valor": "124",
+                  "etiqueta": "calostros_2.2"
+                },
+                {
+                  "valor": "1821",
+                  "etiqueta": "calostros_2.2"
+                },
+                {
+                  "valor": "1398",
+                  "etiqueta": "calostros_2.2"
+                },
+                {
+                  "valor": "1807",
+                  "etiqueta": "calostros_20"
+                },
+                {
+                  "valor": "110",
+                  "etiqueta": "calostros_20"
+                },
+                {
+                  "valor": "1384",
+                  "etiqueta": "calostros_20"
+                },
+                {
+                  "valor": "1385",
+                  "etiqueta": "calostros_21"
+                },
+                {
+                  "valor": "1808",
+                  "etiqueta": "calostros_21"
+                },
+                {
+                  "valor": "111",
+                  "etiqueta": "calostros_21"
+                },
+                {
+                  "valor": "1386",
+                  "etiqueta": "calostros_22"
+                },
+                {
+                  "valor": "1809",
+                  "etiqueta": "calostros_22"
+                },
+                {
+                  "valor": "112",
+                  "etiqueta": "calostros_22"
+                },
+                {
+                  "valor": "1810",
+                  "etiqueta": "calostros_23"
+                },
+                {
+                  "valor": "1387",
+                  "etiqueta": "calostros_23"
+                },
+                {
+                  "valor": "113",
+                  "etiqueta": "calostros_23"
+                },
+                {
+                  "valor": "1286",
+                  "etiqueta": "calostros_3"
+                },
+                {
+                  "valor": "1709",
+                  "etiqueta": "calostros_3"
+                },
+                {
+                  "valor": "12",
+                  "etiqueta": "calostros_3"
+                },
+                {
+                  "valor": "125",
+                  "etiqueta": "calostros_3.1"
+                },
+                {
+                  "valor": "1822",
+                  "etiqueta": "calostros_3.1"
+                },
+                {
+                  "valor": "1399",
+                  "etiqueta": "calostros_3.1"
+                },
+                {
+                  "valor": "13",
+                  "etiqueta": "calostros_4"
+                },
+                {
+                  "valor": "1710",
+                  "etiqueta": "calostros_4"
+                },
+                {
+                  "valor": "1287",
+                  "etiqueta": "calostros_4"
+                },
+                {
+                  "valor": "129",
+                  "etiqueta": "calostros_4.1"
+                },
+                {
+                  "valor": "1826",
+                  "etiqueta": "calostros_4.1"
+                },
+                {
+                  "valor": "1403",
+                  "etiqueta": "calostros_4.1"
+                },
+                {
+                  "valor": "1711",
+                  "etiqueta": "calostros_5"
+                },
+                {
+                  "valor": "14",
+                  "etiqueta": "calostros_5"
+                },
+                {
+                  "valor": "1288",
+                  "etiqueta": "calostros_5"
+                },
+                {
+                  "valor": "1824",
+                  "etiqueta": "calostros_5.1"
+                },
+                {
+                  "valor": "127",
+                  "etiqueta": "calostros_5.1"
+                },
+                {
+                  "valor": "1401",
+                  "etiqueta": "calostros_5.1"
+                },
+                {
+                  "valor": "1290",
+                  "etiqueta": "calostros_6"
+                },
+                {
+                  "valor": "1713",
+                  "etiqueta": "calostros_6"
+                },
+                {
+                  "valor": "16",
+                  "etiqueta": "calostros_6"
+                },
+                {
+                  "valor": "1402",
+                  "etiqueta": "calostros_6.1"
+                },
+                {
+                  "valor": "128",
+                  "etiqueta": "calostros_6.1"
+                },
+                {
+                  "valor": "1825",
+                  "etiqueta": "calostros_6.1"
+                },
+                {
+                  "valor": "15",
+                  "etiqueta": "calostros_7"
+                },
+                {
+                  "valor": "1712",
+                  "etiqueta": "calostros_7"
+                },
+                {
+                  "valor": "1289",
+                  "etiqueta": "calostros_7"
+                },
+                {
+                  "valor": "1341",
+                  "etiqueta": "calostros_8"
+                },
+                {
+                  "valor": "1764",
+                  "etiqueta": "calostros_8"
+                },
+                {
+                  "valor": "67",
+                  "etiqueta": "calostros_8"
+                },
+                {
+                  "valor": "68",
+                  "etiqueta": "calostros_9"
+                },
+                {
+                  "valor": "1342",
+                  "etiqueta": "calostros_9"
+                },
+                {
+                  "valor": "1765",
+                  "etiqueta": "calostros_9"
+                },
+                {
+                  "valor": "1714",
+                  "etiqueta": "elcisne_1"
+                },
+                {
+                  "valor": "17",
+                  "etiqueta": "elcisne_1"
+                },
+                {
+                  "valor": "1291",
+                  "etiqueta": "elcisne_1"
+                },
+                {
+                  "valor": "1388",
+                  "etiqueta": "elcisne_1.1"
+                },
+                {
+                  "valor": "114",
+                  "etiqueta": "elcisne_1.1"
+                },
+                {
+                  "valor": "1811",
+                  "etiqueta": "elcisne_1.1"
+                },
+                {
+                  "valor": "1404",
+                  "etiqueta": "elcisne_1.2"
+                },
+                {
+                  "valor": "130",
+                  "etiqueta": "elcisne_1.2"
+                },
+                {
+                  "valor": "1827",
+                  "etiqueta": "elcisne_1.2"
+                },
+                {
+                  "valor": "26",
+                  "etiqueta": "elcisne_10"
+                },
+                {
+                  "valor": "1723",
+                  "etiqueta": "elcisne_10"
+                },
+                {
+                  "valor": "1300",
+                  "etiqueta": "elcisne_10"
+                },
+                {
+                  "valor": "27",
+                  "etiqueta": "elcisne_11"
+                },
+                {
+                  "valor": "1724",
+                  "etiqueta": "elcisne_11"
+                },
+                {
+                  "valor": "1301",
+                  "etiqueta": "elcisne_11"
+                },
+                {
+                  "valor": "1302",
+                  "etiqueta": "elcisne_12"
+                },
+                {
+                  "valor": "1725",
+                  "etiqueta": "elcisne_12"
+                },
+                {
+                  "valor": "28",
+                  "etiqueta": "elcisne_12"
+                },
+                {
+                  "valor": "29",
+                  "etiqueta": "elcisne_13"
+                },
+                {
+                  "valor": "1726",
+                  "etiqueta": "elcisne_13"
+                },
+                {
+                  "valor": "1303",
+                  "etiqueta": "elcisne_13"
+                },
+                {
+                  "valor": "1727",
+                  "etiqueta": "elcisne_14"
+                },
+                {
+                  "valor": "30",
+                  "etiqueta": "elcisne_14"
+                },
+                {
+                  "valor": "1304",
+                  "etiqueta": "elcisne_14"
+                },
+                {
+                  "valor": "1305",
+                  "etiqueta": "elcisne_15"
+                },
+                {
+                  "valor": "31",
+                  "etiqueta": "elcisne_15"
+                },
+                {
+                  "valor": "1728",
+                  "etiqueta": "elcisne_15"
+                },
+                {
+                  "valor": "1306",
+                  "etiqueta": "elcisne_16"
+                },
+                {
+                  "valor": "1729",
+                  "etiqueta": "elcisne_16"
+                },
+                {
+                  "valor": "32",
+                  "etiqueta": "elcisne_16"
+                },
+                {
+                  "valor": "33",
+                  "etiqueta": "elcisne_17"
+                },
+                {
+                  "valor": "1730",
+                  "etiqueta": "elcisne_17"
+                },
+                {
+                  "valor": "1307",
+                  "etiqueta": "elcisne_17"
+                },
+                {
+                  "valor": "1731",
+                  "etiqueta": "elcisne_18"
+                },
+                {
+                  "valor": "34",
+                  "etiqueta": "elcisne_18"
+                },
+                {
+                  "valor": "1308",
+                  "etiqueta": "elcisne_18"
+                },
+                {
+                  "valor": "35",
+                  "etiqueta": "elcisne_19"
+                },
+                {
+                  "valor": "1732",
+                  "etiqueta": "elcisne_19"
+                },
+                {
+                  "valor": "1309",
+                  "etiqueta": "elcisne_19"
+                },
+                {
+                  "valor": "1292",
+                  "etiqueta": "elcisne_2"
+                },
+                {
+                  "valor": "18",
+                  "etiqueta": "elcisne_2"
+                },
+                {
+                  "valor": "1715",
+                  "etiqueta": "elcisne_2"
+                },
+                {
+                  "valor": "1812",
+                  "etiqueta": "elcisne_2.1"
+                },
+                {
+                  "valor": "1389",
+                  "etiqueta": "elcisne_2.1"
+                },
+                {
+                  "valor": "115",
+                  "etiqueta": "elcisne_2.1"
+                },
+                {
+                  "valor": "131",
+                  "etiqueta": "elcisne_2.2"
+                },
+                {
+                  "valor": "1405",
+                  "etiqueta": "elcisne_2.2"
+                },
+                {
+                  "valor": "1828",
+                  "etiqueta": "elcisne_2.2"
+                },
+                {
+                  "valor": "36",
+                  "etiqueta": "elcisne_20"
+                },
+                {
+                  "valor": "1310",
+                  "etiqueta": "elcisne_20"
+                },
+                {
+                  "valor": "1733",
+                  "etiqueta": "elcisne_20"
+                },
+                {
+                  "valor": "1734",
+                  "etiqueta": "elcisne_21"
+                },
+                {
+                  "valor": "1311",
+                  "etiqueta": "elcisne_21"
+                },
+                {
+                  "valor": "37",
+                  "etiqueta": "elcisne_21"
+                },
+                {
+                  "valor": "38",
+                  "etiqueta": "elcisne_22"
+                },
+                {
+                  "valor": "1312",
+                  "etiqueta": "elcisne_22"
+                },
+                {
+                  "valor": "1735",
+                  "etiqueta": "elcisne_22"
+                },
+                {
+                  "valor": "1313",
+                  "etiqueta": "elcisne_23"
+                },
+                {
+                  "valor": "1736",
+                  "etiqueta": "elcisne_23"
+                },
+                {
+                  "valor": "39",
+                  "etiqueta": "elcisne_23"
+                },
+                {
+                  "valor": "1737",
+                  "etiqueta": "elcisne_24"
+                },
+                {
+                  "valor": "1314",
+                  "etiqueta": "elcisne_24"
+                },
+                {
+                  "valor": "40",
+                  "etiqueta": "elcisne_24"
+                },
+                {
+                  "valor": "1293",
+                  "etiqueta": "elcisne_3"
+                },
+                {
+                  "valor": "1716",
+                  "etiqueta": "elcisne_3"
+                },
+                {
+                  "valor": "19",
+                  "etiqueta": "elcisne_3"
+                },
+                {
+                  "valor": "1813",
+                  "etiqueta": "elcisne_3.1"
+                },
+                {
+                  "valor": "116",
+                  "etiqueta": "elcisne_3.1"
+                },
+                {
+                  "valor": "1390",
+                  "etiqueta": "elcisne_3.1"
+                },
+                {
+                  "valor": "1829",
+                  "etiqueta": "elcisne_3.2"
+                },
+                {
+                  "valor": "132",
+                  "etiqueta": "elcisne_3.2"
+                },
+                {
+                  "valor": "1406",
+                  "etiqueta": "elcisne_3.2"
+                },
+                {
+                  "valor": "1717",
+                  "etiqueta": "elcisne_4"
+                },
+                {
+                  "valor": "20",
+                  "etiqueta": "elcisne_4"
+                },
+                {
+                  "valor": "1294",
+                  "etiqueta": "elcisne_4"
+                },
+                {
+                  "valor": "117",
+                  "etiqueta": "elcisne_4.1"
+                },
+                {
+                  "valor": "1814",
+                  "etiqueta": "elcisne_4.1"
+                },
+                {
+                  "valor": "1391",
+                  "etiqueta": "elcisne_4.1"
+                },
+                {
+                  "valor": "1718",
+                  "etiqueta": "elcisne_5"
+                },
+                {
+                  "valor": "21",
+                  "etiqueta": "elcisne_5"
+                },
+                {
+                  "valor": "1295",
+                  "etiqueta": "elcisne_5"
+                },
+                {
+                  "valor": "1815",
+                  "etiqueta": "elcisne_5.1"
+                },
+                {
+                  "valor": "118",
+                  "etiqueta": "elcisne_5.1"
+                },
+                {
+                  "valor": "1392",
+                  "etiqueta": "elcisne_5.1"
+                },
+                {
+                  "valor": "1719",
+                  "etiqueta": "elcisne_6"
+                },
+                {
+                  "valor": "1296",
+                  "etiqueta": "elcisne_6"
+                },
+                {
+                  "valor": "22",
+                  "etiqueta": "elcisne_6"
+                },
+                {
+                  "valor": "1816",
+                  "etiqueta": "elcisne_6.1"
+                },
+                {
+                  "valor": "119",
+                  "etiqueta": "elcisne_6.1"
+                },
+                {
+                  "valor": "1393",
+                  "etiqueta": "elcisne_6.1"
+                },
+                {
+                  "valor": "1720",
+                  "etiqueta": "elcisne_7"
+                },
+                {
+                  "valor": "1297",
+                  "etiqueta": "elcisne_7"
+                },
+                {
+                  "valor": "23",
+                  "etiqueta": "elcisne_7"
+                },
+                {
+                  "valor": "120",
+                  "etiqueta": "elcisne_7.1"
+                },
+                {
+                  "valor": "1394",
+                  "etiqueta": "elcisne_7.1"
+                },
+                {
+                  "valor": "1817",
+                  "etiqueta": "elcisne_7.1"
+                },
+                {
+                  "valor": "1298",
+                  "etiqueta": "elcisne_8"
+                },
+                {
+                  "valor": "1721",
+                  "etiqueta": "elcisne_8"
+                },
+                {
+                  "valor": "24",
+                  "etiqueta": "elcisne_8"
+                },
+                {
+                  "valor": "25",
+                  "etiqueta": "elcisne_9"
+                },
+                {
+                  "valor": "1722",
+                  "etiqueta": "elcisne_9"
+                },
+                {
+                  "valor": "1299",
+                  "etiqueta": "elcisne_9"
+                },
+                {
+                  "valor": "1786",
+                  "etiqueta": "lagunaseca_1"
+                },
+                {
+                  "valor": "1363",
+                  "etiqueta": "lagunaseca_1"
+                },
+                {
+                  "valor": "89",
+                  "etiqueta": "lagunaseca_1"
+                },
+                {
+                  "valor": "1372",
+                  "etiqueta": "lagunaseca_10"
+                },
+                {
+                  "valor": "98",
+                  "etiqueta": "lagunaseca_10"
+                },
+                {
+                  "valor": "1795",
+                  "etiqueta": "lagunaseca_10"
+                },
+                {
+                  "valor": "99",
+                  "etiqueta": "lagunaseca_11"
+                },
+                {
+                  "valor": "1796",
+                  "etiqueta": "lagunaseca_11"
+                },
+                {
+                  "valor": "1373",
+                  "etiqueta": "lagunaseca_11"
+                },
+                {
+                  "valor": "1797",
+                  "etiqueta": "lagunaseca_12"
+                },
+                {
+                  "valor": "1374",
+                  "etiqueta": "lagunaseca_12"
+                },
+                {
+                  "valor": "100",
+                  "etiqueta": "lagunaseca_12"
+                },
+                {
+                  "valor": "1798",
+                  "etiqueta": "lagunaseca_13"
+                },
+                {
+                  "valor": "1375",
+                  "etiqueta": "lagunaseca_13"
+                },
+                {
+                  "valor": "101",
+                  "etiqueta": "lagunaseca_13"
+                },
+                {
+                  "valor": "1376",
+                  "etiqueta": "lagunaseca_14"
+                },
+                {
+                  "valor": "102",
+                  "etiqueta": "lagunaseca_14"
+                },
+                {
+                  "valor": "1799",
+                  "etiqueta": "lagunaseca_14"
+                },
+                {
+                  "valor": "103",
+                  "etiqueta": "lagunaseca_15"
+                },
+                {
+                  "valor": "1377",
+                  "etiqueta": "lagunaseca_15"
+                },
+                {
+                  "valor": "1800",
+                  "etiqueta": "lagunaseca_15"
+                },
+                {
+                  "valor": "1378",
+                  "etiqueta": "lagunaseca_16"
+                },
+                {
+                  "valor": "104",
+                  "etiqueta": "lagunaseca_16"
+                },
+                {
+                  "valor": "1801",
+                  "etiqueta": "lagunaseca_16"
+                },
+                {
+                  "valor": "1379",
+                  "etiqueta": "lagunaseca_17"
+                },
+                {
+                  "valor": "1802",
+                  "etiqueta": "lagunaseca_17"
+                },
+                {
+                  "valor": "105",
+                  "etiqueta": "lagunaseca_17"
+                },
+                {
+                  "valor": "106",
+                  "etiqueta": "lagunaseca_18"
+                },
+                {
+                  "valor": "1380",
+                  "etiqueta": "lagunaseca_18"
+                },
+                {
+                  "valor": "1803",
+                  "etiqueta": "lagunaseca_18"
+                },
+                {
+                  "valor": "1787",
+                  "etiqueta": "lagunaseca_2"
+                },
+                {
+                  "valor": "90",
+                  "etiqueta": "lagunaseca_2"
+                },
+                {
+                  "valor": "1364",
+                  "etiqueta": "lagunaseca_2"
+                },
+                {
+                  "valor": "1788",
+                  "etiqueta": "lagunaseca_3"
+                },
+                {
+                  "valor": "91",
+                  "etiqueta": "lagunaseca_3"
+                },
+                {
+                  "valor": "1365",
+                  "etiqueta": "lagunaseca_3"
+                },
+                {
+                  "valor": "92",
+                  "etiqueta": "lagunaseca_4"
+                },
+                {
+                  "valor": "1789",
+                  "etiqueta": "lagunaseca_4"
+                },
+                {
+                  "valor": "1366",
+                  "etiqueta": "lagunaseca_4"
+                },
+                {
+                  "valor": "93",
+                  "etiqueta": "lagunaseca_5"
+                },
+                {
+                  "valor": "1367",
+                  "etiqueta": "lagunaseca_5"
+                },
+                {
+                  "valor": "1790",
+                  "etiqueta": "lagunaseca_5"
+                },
+                {
+                  "valor": "1368",
+                  "etiqueta": "lagunaseca_6"
+                },
+                {
+                  "valor": "94",
+                  "etiqueta": "lagunaseca_6"
+                },
+                {
+                  "valor": "1791",
+                  "etiqueta": "lagunaseca_6"
+                },
+                {
+                  "valor": "126",
+                  "etiqueta": "lagunaseca_6.1"
+                },
+                {
+                  "valor": "1823",
+                  "etiqueta": "lagunaseca_6.1"
+                },
+                {
+                  "valor": "1400",
+                  "etiqueta": "lagunaseca_6.1"
+                },
+                {
+                  "valor": "1792",
+                  "etiqueta": "lagunaseca_7"
+                },
+                {
+                  "valor": "1369",
+                  "etiqueta": "lagunaseca_7"
+                },
+                {
+                  "valor": "95",
+                  "etiqueta": "lagunaseca_7"
+                },
+                {
+                  "valor": "1793",
+                  "etiqueta": "lagunaseca_8"
+                },
+                {
+                  "valor": "96",
+                  "etiqueta": "lagunaseca_8"
+                },
+                {
+                  "valor": "1370",
+                  "etiqueta": "lagunaseca_8"
+                },
+                {
+                  "valor": "1371",
+                  "etiqueta": "lagunaseca_9"
+                },
+                {
+                  "valor": "97",
+                  "etiqueta": "lagunaseca_9"
+                },
+                {
+                  "valor": "1794",
+                  "etiqueta": "lagunaseca_9"
+                },
+                {
+                  "valor": "1846",
+                  "etiqueta": "periglaciar _1"
+                },
+                {
+                  "valor": "149",
+                  "etiqueta": "periglaciar _1"
+                },
+                {
+                  "valor": "1423",
+                  "etiqueta": "periglaciar _1"
+                },
+                {
+                  "valor": "1738",
+                  "etiqueta": "periglaciar_1"
+                },
+                {
+                  "valor": "41",
+                  "etiqueta": "periglaciar_1"
+                },
+                {
+                  "valor": "1315",
+                  "etiqueta": "periglaciar_1"
+                },
+                {
+                  "valor": "1830",
+                  "etiqueta": "periglaciar_1.1"
+                },
+                {
+                  "valor": "133",
+                  "etiqueta": "periglaciar_1.1"
+                },
+                {
+                  "valor": "1407",
+                  "etiqueta": "periglaciar_1.1"
+                },
+                {
+                  "valor": "1831",
+                  "etiqueta": "periglaciar_1.2"
+                },
+                {
+                  "valor": "134",
+                  "etiqueta": "periglaciar_1.2"
+                },
+                {
+                  "valor": "1408",
+                  "etiqueta": "periglaciar_1.2"
+                },
+                {
+                  "valor": "1409",
+                  "etiqueta": "periglaciar_1.3"
+                },
+                {
+                  "valor": "1832",
+                  "etiqueta": "periglaciar_1.3"
+                },
+                {
+                  "valor": "135",
+                  "etiqueta": "periglaciar_1.3"
+                },
+                {
+                  "valor": "136",
+                  "etiqueta": "periglaciar_1.4"
+                },
+                {
+                  "valor": "1833",
+                  "etiqueta": "periglaciar_1.4"
+                },
+                {
+                  "valor": "1410",
+                  "etiqueta": "periglaciar_1.4"
+                },
+                {
+                  "valor": "50",
+                  "etiqueta": "periglaciar_10"
+                },
+                {
+                  "valor": "1747",
+                  "etiqueta": "periglaciar_10"
+                },
+                {
+                  "valor": "1324",
+                  "etiqueta": "periglaciar_10"
+                },
+                {
+                  "valor": "1325",
+                  "etiqueta": "periglaciar_11"
+                },
+                {
+                  "valor": "51",
+                  "etiqueta": "periglaciar_11"
+                },
+                {
+                  "valor": "1748",
+                  "etiqueta": "periglaciar_11"
+                },
+                {
+                  "valor": "52",
+                  "etiqueta": "periglaciar_12"
+                },
+                {
+                  "valor": "1749",
+                  "etiqueta": "periglaciar_12"
+                },
+                {
+                  "valor": "1326",
+                  "etiqueta": "periglaciar_12"
+                },
+                {
+                  "valor": "53",
+                  "etiqueta": "periglaciar_13"
+                },
+                {
+                  "valor": "1750",
+                  "etiqueta": "periglaciar_13"
+                },
+                {
+                  "valor": "1327",
+                  "etiqueta": "periglaciar_13"
+                },
+                {
+                  "valor": "1751",
+                  "etiqueta": "periglaciar_14"
+                },
+                {
+                  "valor": "1328",
+                  "etiqueta": "periglaciar_14"
+                },
+                {
+                  "valor": "54",
+                  "etiqueta": "periglaciar_14"
+                },
+                {
+                  "valor": "1329",
+                  "etiqueta": "periglaciar_15"
+                },
+                {
+                  "valor": "1752",
+                  "etiqueta": "periglaciar_15"
+                },
+                {
+                  "valor": "55",
+                  "etiqueta": "periglaciar_15"
+                },
+                {
+                  "valor": "1753",
+                  "etiqueta": "periglaciar_16"
+                },
+                {
+                  "valor": "56",
+                  "etiqueta": "periglaciar_16"
+                },
+                {
+                  "valor": "1330",
+                  "etiqueta": "periglaciar_16"
+                },
+                {
+                  "valor": "57",
+                  "etiqueta": "periglaciar_17"
+                },
+                {
+                  "valor": "1331",
+                  "etiqueta": "periglaciar_17"
+                },
+                {
+                  "valor": "1754",
+                  "etiqueta": "periglaciar_17"
+                },
+                {
+                  "valor": "58",
+                  "etiqueta": "periglaciar_18"
+                },
+                {
+                  "valor": "1332",
+                  "etiqueta": "periglaciar_18"
+                },
+                {
+                  "valor": "1755",
+                  "etiqueta": "periglaciar_18"
+                },
+                {
+                  "valor": "59",
+                  "etiqueta": "periglaciar_19"
+                },
+                {
+                  "valor": "1756",
+                  "etiqueta": "periglaciar_19"
+                },
+                {
+                  "valor": "1333",
+                  "etiqueta": "periglaciar_19"
+                },
+                {
+                  "valor": "42",
+                  "etiqueta": "periglaciar_2"
+                },
+                {
+                  "valor": "1739",
+                  "etiqueta": "periglaciar_2"
+                },
+                {
+                  "valor": "1316",
+                  "etiqueta": "periglaciar_2"
+                },
+                {
+                  "valor": "1317",
+                  "etiqueta": "periglaciar_3"
+                },
+                {
+                  "valor": "1740",
+                  "etiqueta": "periglaciar_3"
+                },
+                {
+                  "valor": "43",
+                  "etiqueta": "periglaciar_3"
+                },
+                {
+                  "valor": "44",
+                  "etiqueta": "periglaciar_4"
+                },
+                {
+                  "valor": "1318",
+                  "etiqueta": "periglaciar_4"
+                },
+                {
+                  "valor": "1741",
+                  "etiqueta": "periglaciar_4"
+                },
+                {
+                  "valor": "1742",
+                  "etiqueta": "periglaciar_5"
+                },
+                {
+                  "valor": "1319",
+                  "etiqueta": "periglaciar_5"
+                },
+                {
+                  "valor": "45",
+                  "etiqueta": "periglaciar_5"
+                },
+                {
+                  "valor": "46",
+                  "etiqueta": "periglaciar_6"
+                },
+                {
+                  "valor": "1743",
+                  "etiqueta": "periglaciar_6"
+                },
+                {
+                  "valor": "1320",
+                  "etiqueta": "periglaciar_6"
+                },
+                {
+                  "valor": "1321",
+                  "etiqueta": "periglaciar_7"
+                },
+                {
+                  "valor": "47",
+                  "etiqueta": "periglaciar_7"
+                },
+                {
+                  "valor": "1744",
+                  "etiqueta": "periglaciar_7"
+                },
+                {
+                  "valor": "1745",
+                  "etiqueta": "periglaciar_8"
+                },
+                {
+                  "valor": "1322",
+                  "etiqueta": "periglaciar_8"
+                },
+                {
+                  "valor": "48",
+                  "etiqueta": "periglaciar_8"
+                },
+                {
+                  "valor": "1746",
+                  "etiqueta": "periglaciar_9"
+                },
+                {
+                  "valor": "49",
+                  "etiqueta": "periglaciar_9"
+                },
+                {
+                  "valor": "1323",
+                  "etiqueta": "periglaciar_9"
+                },
+                {
+                  "valor": "60",
+                  "etiqueta": "sanantonio_1"
+                },
+                {
+                  "valor": "1334",
+                  "etiqueta": "sanantonio_1"
+                },
+                {
+                  "valor": "1757",
+                  "etiqueta": "sanantonio_1"
+                },
+                {
+                  "valor": "121",
+                  "etiqueta": "sanantonio_1.1"
+                },
+                {
+                  "valor": "1818",
+                  "etiqueta": "sanantonio_1.1"
+                },
+                {
+                  "valor": "1395",
+                  "etiqueta": "sanantonio_1.1"
+                },
+                {
+                  "valor": "1411",
+                  "etiqueta": "sanantonio_1.2"
+                },
+                {
+                  "valor": "137",
+                  "etiqueta": "sanantonio_1.2"
+                },
+                {
+                  "valor": "1834",
+                  "etiqueta": "sanantonio_1.2"
+                },
+                {
+                  "valor": "1412",
+                  "etiqueta": "sanantonio_1.3"
+                },
+                {
+                  "valor": "1835",
+                  "etiqueta": "sanantonio_1.3"
+                },
+                {
+                  "valor": "138",
+                  "etiqueta": "sanantonio_1.3"
+                },
+                {
+                  "valor": "139",
+                  "etiqueta": "sanantonio_1.4"
+                },
+                {
+                  "valor": "1413",
+                  "etiqueta": "sanantonio_1.4"
+                },
+                {
+                  "valor": "1836",
+                  "etiqueta": "sanantonio_1.4"
+                },
+                {
+                  "valor": "140",
+                  "etiqueta": "sanantonio_1.5"
+                },
+                {
+                  "valor": "1414",
+                  "etiqueta": "sanantonio_1.5"
+                },
+                {
+                  "valor": "1837",
+                  "etiqueta": "sanantonio_1.5"
+                },
+                {
+                  "valor": "141",
+                  "etiqueta": "sanantonio_1.6"
+                },
+                {
+                  "valor": "1415",
+                  "etiqueta": "sanantonio_1.6"
+                },
+                {
+                  "valor": "1838",
+                  "etiqueta": "sanantonio_1.6"
+                },
+                {
+                  "valor": "142",
+                  "etiqueta": "sanantonio_1.7"
+                },
+                {
+                  "valor": "1839",
+                  "etiqueta": "sanantonio_1.7"
+                },
+                {
+                  "valor": "1416",
+                  "etiqueta": "sanantonio_1.7"
+                },
+                {
+                  "valor": "1840",
+                  "etiqueta": "sanantonio_1.8"
+                },
+                {
+                  "valor": "1417",
+                  "etiqueta": "sanantonio_1.8"
+                },
+                {
+                  "valor": "143",
+                  "etiqueta": "sanantonio_1.8"
+                },
+                {
+                  "valor": "1775",
+                  "etiqueta": "sanantonio_10"
+                },
+                {
+                  "valor": "1352",
+                  "etiqueta": "sanantonio_10"
+                },
+                {
+                  "valor": "78",
+                  "etiqueta": "sanantonio_10"
+                },
+                {
+                  "valor": "1776",
+                  "etiqueta": "sanantonio_11"
+                },
+                {
+                  "valor": "79",
+                  "etiqueta": "sanantonio_11"
+                },
+                {
+                  "valor": "1353",
+                  "etiqueta": "sanantonio_11"
+                },
+                {
+                  "valor": "1354",
+                  "etiqueta": "sanantonio_12"
+                },
+                {
+                  "valor": "1777",
+                  "etiqueta": "sanantonio_12"
+                },
+                {
+                  "valor": "80",
+                  "etiqueta": "sanantonio_12"
+                },
+                {
+                  "valor": "1355",
+                  "etiqueta": "sanantonio_13"
+                },
+                {
+                  "valor": "1778",
+                  "etiqueta": "sanantonio_13"
+                },
+                {
+                  "valor": "81",
+                  "etiqueta": "sanantonio_13"
+                },
+                {
+                  "valor": "82",
+                  "etiqueta": "sanantonio_14"
+                },
+                {
+                  "valor": "1779",
+                  "etiqueta": "sanantonio_14"
+                },
+                {
+                  "valor": "1356",
+                  "etiqueta": "sanantonio_14"
+                },
+                {
+                  "valor": "83",
+                  "etiqueta": "sanantonio_15"
+                },
+                {
+                  "valor": "1780",
+                  "etiqueta": "sanantonio_15"
+                },
+                {
+                  "valor": "1357",
+                  "etiqueta": "sanantonio_15"
+                },
+                {
+                  "valor": "1358",
+                  "etiqueta": "sanantonio_16"
+                },
+                {
+                  "valor": "1781",
+                  "etiqueta": "sanantonio_16"
+                },
+                {
+                  "valor": "84",
+                  "etiqueta": "sanantonio_16"
+                },
+                {
+                  "valor": "85",
+                  "etiqueta": "sanantonio_17"
+                },
+                {
+                  "valor": "1359",
+                  "etiqueta": "sanantonio_17"
+                },
+                {
+                  "valor": "1782",
+                  "etiqueta": "sanantonio_17"
+                },
+                {
+                  "valor": "1360",
+                  "etiqueta": "sanantonio_18"
+                },
+                {
+                  "valor": "86",
+                  "etiqueta": "sanantonio_18"
+                },
+                {
+                  "valor": "1783",
+                  "etiqueta": "sanantonio_18"
+                },
+                {
+                  "valor": "87",
+                  "etiqueta": "sanantonio_19"
+                },
+                {
+                  "valor": "1361",
+                  "etiqueta": "sanantonio_19"
+                },
+                {
+                  "valor": "1784",
+                  "etiqueta": "sanantonio_19"
+                },
+                {
+                  "valor": "1335",
+                  "etiqueta": "sanantonio_2"
+                },
+                {
+                  "valor": "1758",
+                  "etiqueta": "sanantonio_2"
+                },
+                {
+                  "valor": "61",
+                  "etiqueta": "sanantonio_2"
+                },
+                {
+                  "valor": "144",
+                  "etiqueta": "sanantonio_2.1"
+                },
+                {
+                  "valor": "1418",
+                  "etiqueta": "sanantonio_2.1"
+                },
+                {
+                  "valor": "1841",
+                  "etiqueta": "sanantonio_2.1"
+                },
+                {
+                  "valor": "145",
+                  "etiqueta": "sanantonio_2.2"
+                },
+                {
+                  "valor": "1842",
+                  "etiqueta": "sanantonio_2.2"
+                },
+                {
+                  "valor": "1419",
+                  "etiqueta": "sanantonio_2.2"
+                },
+                {
+                  "valor": "1785",
+                  "etiqueta": "sanantonio_20"
+                },
+                {
+                  "valor": "88",
+                  "etiqueta": "sanantonio_20"
+                },
+                {
+                  "valor": "1362",
+                  "etiqueta": "sanantonio_20"
+                },
+                {
+                  "valor": "1759",
+                  "etiqueta": "sanantonio_3"
+                },
+                {
+                  "valor": "62",
+                  "etiqueta": "sanantonio_3"
+                },
+                {
+                  "valor": "1336",
+                  "etiqueta": "sanantonio_3"
+                },
+                {
+                  "valor": "1420",
+                  "etiqueta": "sanantonio_3.1"
+                },
+                {
+                  "valor": "146",
+                  "etiqueta": "sanantonio_3.1"
+                },
+                {
+                  "valor": "1843",
+                  "etiqueta": "sanantonio_3.1"
+                },
+                {
+                  "valor": "147",
+                  "etiqueta": "sanantonio_3.2"
+                },
+                {
+                  "valor": "1421",
+                  "etiqueta": "sanantonio_3.2"
+                },
+                {
+                  "valor": "1844",
+                  "etiqueta": "sanantonio_3.2"
+                },
+                {
+                  "valor": "1337",
+                  "etiqueta": "sanantonio_4"
+                },
+                {
+                  "valor": "1760",
+                  "etiqueta": "sanantonio_4"
+                },
+                {
+                  "valor": "63",
+                  "etiqueta": "sanantonio_4"
+                },
+                {
+                  "valor": "1338",
+                  "etiqueta": "sanantonio_5"
+                },
+                {
+                  "valor": "64",
+                  "etiqueta": "sanantonio_5"
+                },
+                {
+                  "valor": "1761",
+                  "etiqueta": "sanantonio_5"
+                },
+                {
+                  "valor": "1762",
+                  "etiqueta": "sanantonio_6"
+                },
+                {
+                  "valor": "1339",
+                  "etiqueta": "sanantonio_6"
+                },
+                {
+                  "valor": "65",
+                  "etiqueta": "sanantonio_6"
+                },
+                {
+                  "valor": "66",
+                  "etiqueta": "sanantonio_7"
+                },
+                {
+                  "valor": "1340",
+                  "etiqueta": "sanantonio_7"
+                },
+                {
+                  "valor": "1763",
+                  "etiqueta": "sanantonio_7"
+                },
+                {
+                  "valor": "1773",
+                  "etiqueta": "sanantonio_8"
+                },
+                {
+                  "valor": "76",
+                  "etiqueta": "sanantonio_8"
+                },
+                {
+                  "valor": "1350",
+                  "etiqueta": "sanantonio_8"
+                },
+                {
+                  "valor": "1774",
+                  "etiqueta": "sanantonio_9"
+                },
+                {
+                  "valor": "1351",
+                  "etiqueta": "sanantonio_9"
+                },
+                {
+                  "valor": "77",
+                  "etiqueta": "sanantonio_9"
+                }
+              ],
+              "es_fk": true,
+              "modelo_fk": "UnidadMuestreo"
             }
           ]
         },
@@ -40432,6 +42289,10 @@
                 {
                   "valor": "1",
                   "etiqueta": "IDEAM"
+                },
+                {
+                  "valor": "3",
+                  "etiqueta": "SWAMP"
                 }
               ],
               "es_fk": true,
@@ -40473,6 +42334,10 @@
                 {
                   "valor": "1",
                   "etiqueta": "IDEAM"
+                },
+                {
+                  "valor": "3",
+                  "etiqueta": "SWAMP"
                 }
               ],
               "es_fk": true,
@@ -40488,7 +42353,7 @@
               "choices": [
                 {
                   "valor": "4",
-                  "etiqueta": "Alejandra"
+                  "etiqueta": "Alejandra Diaz"
                 },
                 {
                   "valor": "2",
@@ -40670,7 +42535,7 @@
               "choices": [
                 {
                   "valor": "4",
-                  "etiqueta": "Alejandra"
+                  "etiqueta": "Alejandra Diaz"
                 },
                 {
                   "valor": "2",
@@ -40736,6 +42601,10 @@
                 {
                   "valor": "1",
                   "etiqueta": "IDEAM"
+                },
+                {
+                  "valor": "3",
+                  "etiqueta": "SWAMP"
                 }
               ],
               "es_fk": true,
@@ -40751,7 +42620,7 @@
               "choices": [
                 {
                   "valor": "4",
-                  "etiqueta": "Alejandra"
+                  "etiqueta": "Alejandra Diaz"
                 },
                 {
                   "valor": "2",
@@ -40912,6 +42781,10 @@
                 {
                   "valor": "7",
                   "etiqueta": "CO2 (CSV)"
+                },
+                {
+                  "valor": "12",
+                  "etiqueta": "Flujos CO2 (CSV)"
                 }
               ],
               "es_fk": true,
@@ -40996,7 +42869,7 @@
           "verbose_name": "mapeo de columna",
           "verbose_name_plural": "mapeos de columnas",
           "descripcion": "Mapeo de una columna del archivo cargado hacia un campo del modelo destino, con su transformación.",
-          "total_campos": 9,
+          "total_campos": 10,
           "campos": [
             {
               "nombre": "carga",
@@ -41006,6 +42879,66 @@
               "requerido": true,
               "max_length": null,
               "choices": [
+                {
+                  "valor": "160",
+                  "etiqueta": "Carga #160 — Flujos CO2"
+                },
+                {
+                  "valor": "159",
+                  "etiqueta": "Carga #159 — Flujos CO2"
+                },
+                {
+                  "valor": "158",
+                  "etiqueta": "Carga #158 — Flujos CO2"
+                },
+                {
+                  "valor": "157",
+                  "etiqueta": "Carga #157 — Flujos CO2"
+                },
+                {
+                  "valor": "156",
+                  "etiqueta": "Carga #156 — Flujos CO2"
+                },
+                {
+                  "valor": "155",
+                  "etiqueta": "Carga #155 — Flujos CO2"
+                },
+                {
+                  "valor": "154",
+                  "etiqueta": "Carga #154 — Flujos CO2"
+                },
+                {
+                  "valor": "153",
+                  "etiqueta": "Carga #153 — Flujos CO2"
+                },
+                {
+                  "valor": "152",
+                  "etiqueta": "Carga #152 — Flujos CO2"
+                },
+                {
+                  "valor": "151",
+                  "etiqueta": "Carga #151 — Flujos CO2"
+                },
+                {
+                  "valor": "150",
+                  "etiqueta": "Carga #150 — Flujos CO2"
+                },
+                {
+                  "valor": "148",
+                  "etiqueta": "Carga #148 — Flujos CO2"
+                },
+                {
+                  "valor": "145",
+                  "etiqueta": "Carga #145 — Flujos CO2"
+                },
+                {
+                  "valor": "144",
+                  "etiqueta": "Carga #144 — Flujos CO2"
+                },
+                {
+                  "valor": "143",
+                  "etiqueta": "Carga #143 — Flujos CO2"
+                },
                 {
                   "valor": "128",
                   "etiqueta": "Carga #128 — CO2"
@@ -41264,6 +43197,10 @@
                   "etiqueta": "Parsear fecha"
                 },
                 {
+                  "valor": "regex",
+                  "etiqueta": "Expresión regular"
+                },
+                {
                   "valor": "constante",
                   "etiqueta": "Valor constante"
                 },
@@ -41293,6 +43230,17 @@
               "tipo_raw": "CharField",
               "requerido": false,
               "max_length": 500,
+              "choices": [],
+              "es_fk": false,
+              "modelo_fk": null
+            },
+            {
+              "nombre": "regex_patron",
+              "verbose_name": "patrón regex",
+              "tipo": "Texto",
+              "tipo_raw": "CharField",
+              "requerido": false,
+              "max_length": 255,
               "choices": [],
               "es_fk": false,
               "modelo_fk": null

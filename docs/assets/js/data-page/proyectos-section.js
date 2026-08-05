@@ -56,6 +56,7 @@
           <td>
             <div class="source-actions">
               <button class="btn-table-action wide" onclick="filterByProject(${Number(p.id)})">Ver fuentes</button>
+              <a class="btn-table-action wide" href="etl-datos.html?proyecto=${Number(p.id)}">📊 Ver datos cargados</a>
             </div>
           </td>
         </tr>`;

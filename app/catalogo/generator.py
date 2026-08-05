@@ -98,19 +98,41 @@ def semilla_rows(modelo_cls):
     return rows
 
 
-def fk_choices(field):
-    """Instancias existentes del modelo relacionado, para usar como opciones de un FK."""
+# Cómo llegar del modelo relacionado hasta Proyecto, para poder filtrar las
+# opciones de un FK a lo ya cargado en el mismo proyecto (y no mezclar con lo
+# de otros proyectos). Sitio y los catálogos cerrados (UnidadMuestreoTipo,
+# UnidadMedida, …) quedan fuera a propósito: son globales/reutilizables entre
+# proyectos, no pertenecen a uno solo.
+_FILTRO_PROYECTO_POR_MODELO = {
+    "UnidadExperimental": "proyecto",
+    "UnidadMuestreo": "unidad_experimental__proyecto",
+    "Anillo": "unidad_muestreo__unidad_experimental__proyecto",
+    "MuestraAmbiental": "unidad_muestreo__unidad_experimental__proyecto",
+    "MuestraCO2": "unidad_muestreo__unidad_experimental__proyecto",
+}
+
+
+def fk_choices(field, proyecto=None):
+    """Instancias existentes del modelo relacionado, para usar como opciones de un FK.
+
+    Si se pasa `proyecto` y el modelo relacionado tiene forma de acotarse a un
+    proyecto (ver `_FILTRO_PROYECTO_POR_MODELO`), solo se listan las instancias
+    de ese proyecto — así se reutilizan las unidades ya cargadas en vez de
+    mostrar (y potencialmente duplicar) las de todos los proyectos.
+    """
+    modelo_cls = field.related_model
     try:
-        return [
-            {"valor": str(obj.pk), "etiqueta": str(obj)}
-            for obj in field.related_model.objects.all()
-        ]
+        qs = modelo_cls.objects.all()
+        filtro = _FILTRO_PROYECTO_POR_MODELO.get(modelo_cls.__name__)
+        if proyecto is not None and filtro:
+            qs = qs.filter(**{filtro: proyecto})
+        return [{"valor": str(obj.pk), "etiqueta": str(obj)} for obj in qs]
     except Exception:
         # La tabla puede no existir aún (p. ej. generación del catálogo antes de migrar).
         return []
 
 
-def campo_to_catalogo(field):
+def campo_to_catalogo(field, proyecto=None):
     tipo_raw = field.__class__.__name__
     es_fk = tipo_raw == "ForeignKey"
     choices = [
@@ -118,7 +140,7 @@ def campo_to_catalogo(field):
         for valor, etiqueta in (getattr(field, "choices", None) or [])
     ]
     if es_fk and not choices:
-        choices = fk_choices(field)
+        choices = fk_choices(field, proyecto=proyecto)
     return {
         "nombre": field.name,
         "verbose_name": str(getattr(field, "verbose_name", field.name)),

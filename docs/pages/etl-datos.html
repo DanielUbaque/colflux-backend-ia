@@ -54,6 +54,87 @@
     .btn-primary { background: var(--green-d); color: white; border: none; border-radius: 8px; padding: 8px 16px; font-size: .84rem; font-weight: 700; font-family: inherit; cursor: pointer; text-decoration: none; display: inline-block; }
     .btn-primary:hover { opacity: .9; }
 
+    /* ── Dropdown "Cargar" (fuentes del proyecto) ── */
+    .dropdown-wrap { position: relative; }
+    .dropdown-panel {
+      display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 50;
+      background: white; border: 1.5px solid var(--border); border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.14); width: 280px; padding: 8px;
+    }
+    .dropdown-panel.open { display: block; }
+    .dropdown-label { font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--gray); padding: 6px 8px 4px; }
+    .dropdown-item {
+      display: block; width: 100%; text-align: left; background: none; border: none; border-radius: 8px;
+      padding: 8px; font-size: .82rem; font-family: inherit; color: #1a2236; cursor: pointer; text-decoration: none;
+    }
+    .dropdown-item:hover { background: var(--gray-l); }
+    .dropdown-item.active { background: var(--green-l); color: var(--green-d); font-weight: 700; cursor: default; }
+    .dropdown-item small { display: block; font-size: .7rem; color: var(--gray); font-weight: 500; }
+    .dropdown-empty { padding: 10px 8px; font-size: .8rem; color: var(--gray); }
+    .dropdown-sep { border-top: 1px solid var(--border); margin: 6px 0; }
+    .dropdown-add-btn {
+      display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none;
+      border-radius: 8px; padding: 8px; font-size: .82rem; font-weight: 700; font-family: inherit;
+      color: var(--green-d); cursor: pointer;
+    }
+    .dropdown-add-btn:hover { background: var(--green-l); }
+
+    /* ── Drawer "Nueva fuente" (reutilizado de data.html) ── */
+    .drawer-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 200;
+      opacity: 0; pointer-events: none; transition: opacity .25s;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: all; }
+    .drawer {
+      position: fixed; top: 0; right: 0; bottom: 0; width: 440px; max-width: 100vw;
+      background: white; z-index: 201; box-shadow: -8px 0 32px rgba(0,0,0,.15);
+      transform: translateX(100%); transition: transform .28s cubic-bezier(.4,0,.2,1);
+      display: flex; flex-direction: column;
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-header {
+      padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .drawer-header h3 { font-size: 1.05rem; font-weight: 800; }
+    .drawer-close {
+      background: none; border: none; cursor: pointer; color: var(--gray);
+      font-size: 1.3rem; line-height: 1; padding: 4px; border-radius: 6px;
+      transition: background .15s;
+    }
+    .drawer-close:hover { background: var(--gray-l); color: #1a2236; }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+    .field-group { display: flex; flex-direction: column; gap: 6px; }
+    .field-group label { font-size: .8rem; font-weight: 700; color: #374151; }
+    .field-group label span { color: var(--red); margin-left: 2px; }
+    .field-group input, .field-group select, .field-group textarea {
+      border: 1.5px solid var(--border); border-radius: 8px; padding: 9px 12px;
+      font-size: .88rem; font-family: inherit; color: #1a2236; background: white;
+      outline: none; transition: border-color .2s; width: 100%;
+    }
+    .field-group input:focus, .field-group select:focus, .field-group textarea:focus { border-color: var(--green); }
+    .field-group textarea { resize: vertical; min-height: 80px; }
+    .field-hint { font-size: .75rem; color: var(--gray); }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .drawer-footer {
+      padding: 16px 24px; border-top: 1px solid var(--border);
+      display: flex; gap: 10px; align-items: center;
+    }
+    .btn-submit {
+      flex: 1; background: var(--green-d); color: white; border: none; border-radius: 8px;
+      padding: 10px 20px; font-size: .88rem; font-weight: 700; font-family: inherit;
+      cursor: pointer; transition: opacity .2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-submit:hover { opacity: .9; }
+    .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-cancel {
+      background: white; color: var(--gray); border: 1.5px solid var(--border);
+      border-radius: 8px; padding: 10px 16px; font-size: .88rem; font-weight: 600;
+      font-family: inherit; cursor: pointer; transition: border-color .2s;
+    }
+    .btn-cancel:hover { border-color: var(--gray); color: #1a2236; }
+    .form-error { font-size: .8rem; color: var(--red); font-weight: 600; }
+
     .estado-box { padding: 40px 0; text-align: center; color: var(--gray); font-size: .9rem; }
     .error-box { background: var(--red-l); color: var(--red); border-radius: 10px; padding: 14px 18px; font-size: .85rem; margin: 20px 0; }
     .warn-box { background: var(--amber-l); color: #92400e; border-radius: 10px; padding: 14px 18px; font-size: .85rem; margin: 20px 0; }
@@ -122,6 +203,15 @@
     <div class="toolbar-info" id="toolbarInfo"></div>
     <div class="toolbar-actions">
       <button class="btn-secondary" id="btnLimpiarFiltros" style="display:none;">✕ Limpiar filtros</button>
+      <div class="dropdown-wrap" id="cargarDropdownWrap">
+        <button class="btn-secondary" id="btnCargar" type="button">⬆ Cargar ▾</button>
+        <div class="dropdown-panel" id="cargarDropdownPanel">
+          <div class="dropdown-label" id="cargarDropdownLabel">Fuentes de este proyecto</div>
+          <div id="cargarDropdownList"><div class="dropdown-empty">Cargando…</div></div>
+          <div class="dropdown-sep"></div>
+          <button type="button" class="dropdown-add-btn" id="btnNuevaFuente">＋ Agregar nueva fuente</button>
+        </div>
+      </div>
       <button class="btn-secondary" id="btnDescargarCsv">⬇ Descargar Excel</button>
       <a class="btn-secondary" id="linkVolver" href="etl-upload.html">← Volver al ETL</a>
     </div>
@@ -137,15 +227,22 @@
 <script src="../assets/js/layout.js"></script>
 <script src="../assets/js/role-guard.js"></script>
 <script src="../config/services.js"></script>
+<script src="../assets/js/data-page/fuente-drawer.js"></script>
 <script>
   const API_BASE = window.COLFLUX_CONFIG.apiBaseUrl;
   const params = new URLSearchParams(window.location.search);
   const fuenteId = params.get('fuente');
   const cargaId = params.get('carga');
 
+  const proyectoId = params.get('proyecto');
+  let proyectoNombre = null;
+  let proyectoActualId = proyectoId || null;
+  const dropdownData = { proyectos: [], fuentes: [] };
+
   const NOMBRES_VISTA = {
     submuestra_co2: 'Muestras CO₂ (detalle)',
     unidad_muestreo: 'Unidad de Muestreo / Experimental',
+    clima: 'Clima',
   };
 
   const state = {
@@ -159,10 +256,18 @@
     SubmuestraCO2: '#0d4f40', MuestraCO2: '#18735d', UnidadMedida: '#1a6e9b',
     MuestraAmbiental: '#6b4f9e', Camara: '#d97706', Equipo: '#b45309',
     Anillo: '#0e7490', UnidadMuestreo: '#1a6e9b', UnidadExperimental: '#166534',
-    Sitio: '#7c3aed',
+    UnidadMuestreoTipo: '#65a30d', Sitio: '#7c3aed',
   };
 
-  if (fuenteId) document.getElementById('linkVolver').href = `etl-upload.html?fuente=${encodeURIComponent(fuenteId)}`;
+  if (fuenteId) {
+    document.getElementById('linkVolver').href = `etl-upload.html?fuente=${encodeURIComponent(fuenteId)}`;
+  } else if (proyectoId) {
+    const linkVolver = document.getElementById('linkVolver');
+    linkVolver.href = 'data.html';
+    linkVolver.textContent = '← Volver a Gestión de Datos';
+    // No hay endpoint de exportación agregada por proyecto (solo por carga).
+    document.getElementById('btnDescargarCsv').style.display = 'none';
+  }
 
   function escapeHtml(str) {
     return String(str)
@@ -315,9 +420,9 @@
   }
 
   async function cargarDatos() {
-    if (!fuenteId || !cargaId) {
+    if (!proyectoId && (!fuenteId || !cargaId)) {
       document.getElementById('contenido').innerHTML =
-        '<div class="error-box">Falta indicar la fuente y la carga (parámetros ?fuente=&carga= en la URL).</div>';
+        '<div class="error-box">Falta indicar la fuente y la carga, o el proyecto (parámetros ?fuente=&carga= o ?proyecto= en la URL).</div>';
       return;
     }
 
@@ -332,10 +437,12 @@
         offset: state.offset, limite: state.limite, vista: state.vista,
         filtros: JSON.stringify(state.filtros),
       });
-      const res = await fetch(
-        `${API_BASE}/api/fuentes-datos/${fuenteId}/carga/${cargaId}/datos/?${qs}`,
-        { signal: AbortSignal.timeout(Math.max(window.COLFLUX_CONFIG.requestTimeoutMs, 30000)) }
-      );
+      const url = proyectoId
+        ? `${API_BASE}/api/proyectos/${proyectoId}/datos/?${qs}`
+        : `${API_BASE}/api/fuentes-datos/${fuenteId}/carga/${cargaId}/datos/?${qs}`;
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(Math.max(window.COLFLUX_CONFIG.requestTimeoutMs, 30000)),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
@@ -345,8 +452,11 @@
       state.advertencia = data.advertencia;
       state.vistasDisponibles = data.vistas || [state.vista];
 
+      const origen = proyectoId
+        ? (proyectoNombre || `Proyecto #${proyectoId}`)
+        : (proyectoNombre ? `${proyectoNombre} · Carga #${cargaId}` : `Carga #${cargaId}`);
       document.getElementById('heroSubtitulo').textContent =
-        `Carga #${cargaId} — ${NOMBRES_VISTA[state.vista] || state.vista}.`;
+        `${origen} — ${NOMBRES_VISTA[state.vista] || state.vista}.`;
       document.getElementById('toolbarInfo').textContent =
         state.total ? `${state.total} registro${state.total === 1 ? '' : 's'} · ${state.columnas.length} columnas` : 'Sin registros';
 
@@ -369,7 +479,94 @@
     window.location.href = `${API_BASE}/api/fuentes-datos/${fuenteId}/carga/${cargaId}/exportar/`;
   });
 
+  async function cargarNombreProyecto() {
+    if (!proyectoId) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/fuentes-datos/?proyecto=${encodeURIComponent(proyectoId)}`);
+      const data = await res.json().catch(() => ({}));
+      const proyecto = (data.proyectos || []).find(p => String(p.id) === String(proyectoId));
+      if (proyecto) proyectoNombre = proyecto.nombre;
+    } catch (e) { /* si falla, se usa el fallback "Proyecto #id" */ }
+  }
+
+  // ── Dropdown "Cargar": fuentes del proyecto actual + acceso a "Nueva fuente" ──
+  function renderCargarDropdown() {
+    const lista = document.getElementById('cargarDropdownList');
+    document.getElementById('cargarDropdownLabel').textContent =
+      proyectoNombre ? `Fuentes de ${proyectoNombre}` : 'Fuentes de este proyecto';
+    const fuentesProyecto = dropdownData.fuentes.filter(f =>
+      (f.proyecto?.id ?? null) === (proyectoActualId ? Number(proyectoActualId) : null)
+    );
+    if (!fuentesProyecto.length) {
+      lista.innerHTML = '<div class="dropdown-empty">Este proyecto todavía no tiene fuentes.</div>';
+      return;
+    }
+    lista.innerHTML = fuentesProyecto.map(f => {
+      const esActual = fuenteId && String(f.id) === String(fuenteId);
+      return esActual
+        ? `<span class="dropdown-item active">${escapeHtml(f.nombre)}<small>Viendo esta fuente</small></span>`
+        : `<a class="dropdown-item" href="etl-upload.html?fuente=${encodeURIComponent(f.id)}">${escapeHtml(f.nombre)}<small>${escapeHtml(f.tipo_label || f.tipo || '')}</small></a>`;
+    }).join('');
+  }
+
+  async function cargarFuentesDropdown() {
+    try {
+      const url = proyectoActualId
+        ? `${API_BASE}/api/fuentes-datos/?proyecto=${encodeURIComponent(proyectoActualId)}`
+        : `${API_BASE}/api/fuentes-datos/`;
+      const res = await fetch(url);
+      const data = await res.json().catch(() => ({}));
+      dropdownData.proyectos = data.proyectos || [];
+      dropdownData.fuentes = data.fuentes || [];
+
+      if (!proyectoActualId && fuenteId) {
+        const actual = dropdownData.fuentes.find(f => String(f.id) === String(fuenteId));
+        if (actual?.proyecto?.id) {
+          proyectoActualId = actual.proyecto.id;
+          if (!proyectoNombre) proyectoNombre = actual.proyecto.nombre;
+        }
+      }
+    } catch (e) {
+      document.getElementById('cargarDropdownList').innerHTML =
+        '<div class="dropdown-empty">No se pudieron cargar las fuentes.</div>';
+      return;
+    }
+    renderCargarDropdown();
+  }
+
+  function toggleCargarDropdown(mostrar) {
+    document.getElementById('cargarDropdownPanel').classList.toggle('open', mostrar);
+  }
+
+  document.getElementById('btnCargar').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const panel = document.getElementById('cargarDropdownPanel');
+    toggleCargarDropdown(!panel.classList.contains('open'));
+  });
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('cargarDropdownWrap').contains(e.target)) toggleCargarDropdown(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') toggleCargarDropdown(false);
+  });
+  document.getElementById('btnNuevaFuente').addEventListener('click', () => {
+    toggleCargarDropdown(false);
+    window.openDrawer();
+  });
+
+  window.COLFLUX_DATA.fuenteDrawer.init({
+    getData: () => dropdownData,
+    getActiveProyecto: () => proyectoActualId,
+    getApiBase: () => API_BASE,
+    onRender: cargarFuentesDropdown,
+  });
+
   (async () => {
+    await cargarNombreProyecto();
+    // Resuelve el proyecto (y su nombre) antes de pintar el subtítulo y la
+    // tabla, para que la vista quede identificada con su proyecto tanto si
+    // se llega por ?fuente=&carga= como por ?proyecto=.
+    await cargarFuentesDropdown();
     await cargarReglas();
     await cargarDatos();
   })();

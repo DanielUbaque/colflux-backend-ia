@@ -467,7 +467,7 @@
         <span style="font-size:1.3rem;">📖</span>
         <div>
           <div style="font-size:.85rem;font-weight:700;color:var(--blue);">¿No sabes a qué campo mapear?</div>
-          <div style="font-size:.8rem;color:#1e40af;">Consulta el <a href="catalogo-tecnico.html" target="_blank" style="color:var(--blue);font-weight:700;">Catálogo técnico →</a> para ver todas las entidades y sus campos disponibles.</div>
+          <div style="font-size:.8rem;color:#1e40af;">Consulta el <a href="db.html#catalogo" target="_blank" style="color:var(--blue);font-weight:700;">Catálogo técnico →</a> para ver todas las entidades y sus campos disponibles.</div>
         </div>
       </div>
 
@@ -558,6 +558,12 @@
     mapeoValores: {},    // { colIdx: { "valor_origen": "valor_destino" } }
     mapeoSeleccion: {},  // { colIdx: { modelo, campo, sugerido? } }
     atributosManuales: [], // [ { modelo, campo, valor } ] — campos sin columna en la fuente, con valor fijo
+    // Destinos extra: la misma columna origen alimentando otro modelo/campo
+    // además de su destino principal (p. ej. "ID" también como nombre de
+    // UnidadExperimental, vía regex). Mientras no tenga modelo+campo elegidos
+    // vive como fila pendiente bajo la columna origen; una vez resuelto se
+    // renderiza como una fila más dentro de la sección de su propio modelo.
+    extrasDestino: [], // [ { colIdx, modelo, campo, aplicarRegex, regexPatron } ]
     seccionIdx: 0,           // orden de la sección del wizard que se está mostrando/guardando
     seccionesGuardadas: new Set(), // ordenes de sección ya guardadas exitosamente en esta sesión
   };
@@ -961,7 +967,8 @@
 
   // ── Cargar campos destino ─────────────────────────────────────────────────
   async function cargarCamposDestino() {
-    const res = await fetch(`${API_BASE}/api/etl/campos-destino/`, {
+    const qs = state.fuenteId ? `?fuente=${encodeURIComponent(state.fuenteId)}` : '';
+    const res = await fetch(`${API_BASE}/api/etl/campos-destino/${qs}`, {
       signal: AbortSignal.timeout(window.COLFLUX_CONFIG.requestTimeoutMs),
     });
     if (!res.ok) throw new Error(`campos-destino HTTP ${res.status}`);
@@ -1039,13 +1046,18 @@
       });
     });
 
-    const porNombre = new Map(
-      mapeos.filter(m => m.transformacion !== 'constante').map(m => [m.columna_origen, m])
-    );
+    // Una misma columna origen puede tener varios mapeos (destino principal +
+    // destinos extra), así que se agrupan en vez de quedarse con el último.
+    const porNombre = new Map();
+    mapeos.filter(m => m.transformacion !== 'constante').forEach(m => {
+      if (!porNombre.has(m.columna_origen)) porNombre.set(m.columna_origen, []);
+      porNombre.get(m.columna_origen).push(m);
+    });
     let recuperadas = constantes.length;
     state.columnas.forEach((col, idx) => {
-      const m = porNombre.get(col.nombre);
-      if (!m) return;
+      const lista = porNombre.get(col.nombre);
+      if (!lista || !lista.length) return;
+      const [m, ...extrasGuardados] = lista;
       // Las ignoradas explícitamente también se recuperan (no se vuelven a sugerir)
       if (m.transformacion === 'ignorar') {
         state.mapeoSeleccion[idx] = { modelo: '', campo: '' };
@@ -1058,7 +1070,18 @@
         campo: m.campo_destino || '',
         estrategiaNulos: m.estrategia_nulos || 'dejar_null',
         valorRellenoManual: m.valor_relleno_manual || '',
+        aplicarRegex: m.transformacion === 'regex',
+        regexPatron: m.regex_patron || '',
       };
+      extrasGuardados.forEach(e => {
+        state.extrasDestino.push({
+          colIdx: idx,
+          modelo: e.modelo_destino,
+          campo: e.campo_destino,
+          aplicarRegex: e.transformacion === 'regex',
+          regexPatron: e.regex_patron || '',
+        });
+      });
       if (m.mapeo_valores && Object.keys(m.mapeo_valores).length) {
         state.mapeoValores[idx] = { ...m.mapeo_valores };
       }
@@ -1143,23 +1166,25 @@
       .some(v => v.includes('parcela'));
     const tipoUnidadEsTransecto = [...valoresDetectadosParaCampo('UnidadMuestreo', 'tipo')]
       .some(v => v.includes('transecto'));
-    // ¿Ya hay una columna o atributo manual mapeado a UnidadMuestreo.unidad_experimental?
-    const unidadExperimentalMapeada =
-      state.columnas.some((col, idx) => {
-        const sel = state.mapeoSeleccion[idx];
-        return sel && sel.modelo === 'UnidadMuestreo' && sel.campo === 'unidad_experimental';
-      }) ||
-      state.atributosManuales.some(a => a.modelo === 'UnidadMuestreo' && a.campo === 'unidad_experimental');
+    const unidadExperimentalMapeada = unidadExperimentalYaMapeada();
 
     // Agrupar índices de columna por entidad seleccionada
     // ('' = sin decidir, IGNORADAS = "— ignorar —" explícito)
+    // Cada entrada es { kind: 'col', idx } o { kind: 'extra', extraIdx } — un
+    // destino extra ya resuelto (modelo+campo elegidos) se agrupa dentro de
+    // la entidad a la que apunta, no dentro de la de su columna origen.
     const IGNORADAS = '__ignoradas__';
     const grupos = new Map();
     state.columnas.forEach((col, idx) => {
       const seleccion = state.mapeoSeleccion[idx];
       const modelo = seleccion?.modelo || (seleccion ? IGNORADAS : '');
       if (!grupos.has(modelo)) grupos.set(modelo, []);
-      grupos.get(modelo).push(idx);
+      grupos.get(modelo).push({ kind: 'col', idx });
+    });
+    state.extrasDestino.forEach((extra, extraIdx) => {
+      if (!extra.modelo || !extra.campo) return; // aún pendiente: se ve inline bajo su columna origen
+      if (!grupos.has(extra.modelo)) grupos.set(extra.modelo, []);
+      grupos.get(extra.modelo).push({ kind: 'extra', extraIdx });
     });
 
     // Una entidad con solo atributos manuales también forma su grupo
@@ -1182,10 +1207,12 @@
 
       const header = document.createElement('div');
       header.className = 'mapeo-group-header';
-      const n = idxs.length;
+      const n = idxs.filter(item => item.kind === 'col').length;
+      const nExtras = idxs.filter(item => item.kind === 'extra').length;
       const nManuales = state.atributosManuales.filter(a => a.modelo === modelo).length;
       const partes = [];
       if (n) partes.push(`${n} columna${n > 1 ? 's' : ''}`);
+      if (nExtras) partes.push(`${nExtras} extra${nExtras > 1 ? 's' : ''}`);
       if (nManuales) partes.push(`${nManuales} manual${nManuales > 1 ? 'es' : ''}`);
       const sufijo = partes.join(' + ') || 'sin columnas';
       const grupoInfo = grupoDeModelo(modelo);
@@ -1201,12 +1228,14 @@
       groupEl.appendChild(header);
 
       if (modelo === 'UnidadMuestreo') {
-        const vinculo = document.createElement('div');
-        vinculo.className = 'mapeo-group-vinculo' + (unidadExperimentalMapeada ? '' : ' pendiente');
-        vinculo.textContent = unidadExperimentalMapeada
-          ? '🔗 "unidad_experimental" mapeada desde una columna del archivo.'
-          : '💡 "unidad_experimental" no está mapeada: cada unidad de muestreo se vinculará automáticamente a la Unidad Experimental creada para esa misma fila en la sección anterior.';
-        groupEl.appendChild(vinculo);
+        if (unidadExperimentalMapeada) {
+          groupEl.appendChild(renderVinculoUnidadExperimentalRow());
+        } else {
+          const vinculo = document.createElement('div');
+          vinculo.className = 'mapeo-group-vinculo pendiente';
+          vinculo.textContent = '💡 "unidad_experimental" no está mapeada: cada unidad de muestreo se vinculará automáticamente a la Unidad Experimental creada para esa misma fila en la sección anterior.';
+          groupEl.appendChild(vinculo);
+        }
       }
 
       if (modelo === 'Parcela') {
@@ -1227,7 +1256,9 @@
         groupEl.appendChild(vinculo);
       }
 
-      idxs.forEach(idx => groupEl.appendChild(renderMapeoRow(idx)));
+      idxs.forEach(item => groupEl.appendChild(
+        item.kind === 'extra' ? renderExtraRow(item.extraIdx) : renderMapeoRow(item.idx)
+      ));
 
       // Atributos manuales de esta entidad + botón para agregar otro
       state.atributosManuales.forEach((attr, i) => {
@@ -1264,7 +1295,7 @@
         header.className = 'mapeo-group-header sin-mapear';
         header.textContent = `🕗 Sin mapear · ${sinMapearIdxs.length} columna${sinMapearIdxs.length > 1 ? 's' : ''}`;
         list.appendChild(header);
-        sinMapearIdxs.forEach(idx => list.appendChild(renderMapeoRow(idx)));
+        sinMapearIdxs.forEach(item => list.appendChild(renderMapeoRow(item.idx)));
       }
 
       // Entidades con al menos una columna o atributo manual mapeado,
@@ -1278,7 +1309,7 @@
         header.className = 'mapeo-group-header sin-mapear';
         header.textContent = `🚫 Ignoradas · ${ignoradasIdxs.length} columna${ignoradasIdxs.length > 1 ? 's' : ''}`;
         list.appendChild(header);
-        ignoradasIdxs.forEach(idx => list.appendChild(renderMapeoRow(idx)));
+        ignoradasIdxs.forEach(item => list.appendChild(renderMapeoRow(item.idx)));
       }
 
       renderSeccionNav();
@@ -1321,6 +1352,7 @@
     const selCampo = document.createElement('select');
     selCampo.innerHTML = '<option value="">— campo —</option>';
     (state.modelosDestino[attr.modelo] || []).forEach(c => {
+      if (ocultarOpcionUnidadExperimental(attr.modelo, c.nombre, attr.campo)) return;
       const opt = document.createElement('option');
       opt.value = c.nombre;
       opt.textContent = c.verbose_name ? `${c.verbose_name} (${c.nombre})` : c.nombre;
@@ -1393,6 +1425,77 @@
       renderMapeoRows();
     });
     destDiv.appendChild(btnQuitar);
+
+    row.appendChild(infoDiv);
+    row.appendChild(arrowDiv);
+    row.appendChild(destDiv);
+    return row;
+  }
+
+  // ¿Ya hay una columna o atributo manual mapeado a UnidadMuestreo.unidad_experimental?
+  function unidadExperimentalYaMapeada() {
+    return state.columnas.some((col, idx) => {
+      const sel = state.mapeoSeleccion[idx];
+      return sel && sel.modelo === 'UnidadMuestreo' && sel.campo === 'unidad_experimental';
+    }) || state.atributosManuales.some(a => a.modelo === 'UnidadMuestreo' && a.campo === 'unidad_experimental');
+  }
+
+  // Una vez que "unidad_experimental" ya quedó resuelto en algún lado (fila
+  // de solo lectura de arriba), no tiene sentido seguir ofreciéndolo como
+  // opción en los demás selects de campo: solo puede haber un mapeo de ese
+  // campo por vez. `campoActual` es el valor ya elegido en ESE select en
+  // particular, para no ocultarle la opción a la fila que ya lo tiene.
+  function ocultarOpcionUnidadExperimental(modelo, nombreCampo, campoActual) {
+    return modelo === 'UnidadMuestreo' && nombreCampo === 'unidad_experimental' &&
+      campoActual !== 'unidad_experimental' && unidadExperimentalYaMapeada();
+  }
+
+  // De dónde sale el valor ya asignado a UnidadMuestreo.unidad_experimental
+  // (columna del archivo o atributo manual), para mostrarlo como referencia
+  // en la fila de solo-lectura de abajo.
+  function origenUnidadExperimentalMapeada() {
+    const idx = state.columnas.findIndex((col, i) => {
+      const sel = state.mapeoSeleccion[i];
+      return sel && sel.modelo === 'UnidadMuestreo' && sel.campo === 'unidad_experimental';
+    });
+    if (idx !== -1) return `columna "${state.columnas[idx].nombre}"`;
+    const attr = state.atributosManuales.find(a => a.modelo === 'UnidadMuestreo' && a.campo === 'unidad_experimental');
+    if (attr) return 'un atributo manual';
+    return null;
+  }
+
+  // Fila de solo lectura (mismo estilo que un atributo manual, pero
+  // deshabilitada) que muestra que "unidad_experimental" ya quedó resuelto —
+  // no por el vínculo automático por fila, sino porque el usuario lo mapeó
+  // explícitamente (típicamente porque la Unidad Experimental viene de una
+  // carga anterior y hay que referenciarla por columna, no por posición).
+  function renderVinculoUnidadExperimentalRow() {
+    const origen = origenUnidadExperimentalMapeada();
+    const row = document.createElement('div');
+    row.className = 'mapeo-row';
+    row.style.cssText = 'opacity:.7;background:var(--gray-l);';
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'mapeo-col-info';
+    infoDiv.innerHTML = `
+      <div class="mapeo-col-name">
+        <span class="mapeo-sugerido" style="background:var(--blue-l);color:var(--blue);">🔗 vinculado</span>
+        mapeado desde la carga anterior
+      </div>
+      ${origen ? `<div class="mapeo-sample">viene de ${escapeHtml(origen)}</div>` : ''}
+    `;
+
+    const arrowDiv = document.createElement('div');
+    arrowDiv.className = 'mapeo-arrow';
+    arrowDiv.textContent = '→';
+
+    const destDiv = document.createElement('div');
+    destDiv.className = 'mapeo-col-destino';
+    const campoDeshabilitado = document.createElement('div');
+    campoDeshabilitado.textContent = 'unidad experimental (unidad_experimental)';
+    campoDeshabilitado.title = 'Este campo ya está resuelto — edítalo desde la fila de la columna que lo mapea, arriba.';
+    campoDeshabilitado.style.cssText = 'width:100%;border:1.5px solid var(--border);border-radius:8px;padding:7px 12px;font-size:.82rem;font-family:inherit;background:var(--gray-l);color:var(--gray);cursor:not-allowed;';
+    destDiv.appendChild(campoDeshabilitado);
 
     row.appendChild(infoDiv);
     row.appendChild(arrowDiv);
@@ -1722,10 +1825,12 @@
       selCampo.appendChild(optCampo);
       const campos = state.modelosDestino[modelo] || [];
       campos.forEach(c => {
+        if (ocultarOpcionUnidadExperimental(modelo, c.nombre, seleccion.campo)) return;
         const opt = document.createElement('option');
         opt.value = c.nombre;
         opt.textContent = c.verbose_name ? `${c.verbose_name} (${c.nombre})` : c.nombre;
         if (c.es_fk) opt.textContent += ' 🔗';
+        if (esAutoVinculable(modelo, c.nombre)) opt.textContent += ' · se vincula solo';
         selCampo.appendChild(opt);
       });
       selCampo.value = seleccion.campo || '';
@@ -1871,6 +1976,7 @@
       state.mapeoSeleccion[idx] = {
         modelo: selModelo.value, campo: '',
         estrategiaNulos: seleccion.estrategiaNulos, valorRellenoManual: seleccion.valorRellenoManual,
+        aplicarRegex: false, regexPatron: '',
       };
       renderMapeoRows();
     });
@@ -1879,6 +1985,7 @@
       state.mapeoSeleccion[idx] = {
         modelo: selModelo.value, campo: selCampo.value,
         estrategiaNulos: seleccion.estrategiaNulos, valorRellenoManual: seleccion.valorRellenoManual,
+        aplicarRegex: seleccion.aplicarRegex, regexPatron: seleccion.regexPatron,
       };
       infoDiv.querySelector('.mapeo-sugerido')?.remove();
       // Si se (des)asigna UnidadMuestreo.tipo o .unidad_experimental, los
@@ -1893,16 +2000,282 @@
       }
     });
 
+    const linkRegexPrincipal = document.createElement('button');
+    linkRegexPrincipal.type = 'button';
+    linkRegexPrincipal.style.cssText = 'border:none;background:none;color:var(--green);cursor:pointer;font-size:.76rem;font-weight:600;white-space:nowrap;';
+    linkRegexPrincipal.textContent = seleccion.aplicarRegex ? 'quitar regex' : '🧩 aplicar regex al campo';
+
+    const regexInputPrincipal = document.createElement('input');
+    regexInputPrincipal.type = 'text';
+    regexInputPrincipal.placeholder = String.raw`^SWAMP_CO2_(.+?)_\d+$`;
+    regexInputPrincipal.value = seleccion.regexPatron || '';
+    regexInputPrincipal.style.cssText = 'min-width:200px;font-size:.78rem;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:monospace;';
+    regexInputPrincipal.style.display = seleccion.aplicarRegex ? '' : 'none';
+
+    const previewPrincipal = crearVistaPreviaRegex(col);
+    previewPrincipal.el.style.display = seleccion.aplicarRegex ? '' : 'none';
+    if (seleccion.aplicarRegex) previewPrincipal.actualizar(regexInputPrincipal.value);
+
+    regexInputPrincipal.addEventListener('input', () => {
+      state.mapeoSeleccion[idx] = { ...state.mapeoSeleccion[idx], regexPatron: regexInputPrincipal.value };
+      previewPrincipal.actualizar(regexInputPrincipal.value);
+    });
+
+    linkRegexPrincipal.addEventListener('click', () => {
+      const activar = !state.mapeoSeleccion[idx]?.aplicarRegex;
+      state.mapeoSeleccion[idx] = { ...state.mapeoSeleccion[idx], aplicarRegex: activar };
+      linkRegexPrincipal.textContent = activar ? 'quitar regex' : '🧩 aplicar regex al campo';
+      regexInputPrincipal.style.display = activar ? '' : 'none';
+      previewPrincipal.el.style.display = activar ? '' : 'none';
+      if (activar) {
+        regexInputPrincipal.focus();
+        previewPrincipal.actualizar(regexInputPrincipal.value);
+      }
+    });
+
     destDiv.appendChild(selModelo);
     destDiv.appendChild(selCampo);
+    if (esAutoVinculable(selModelo.value, selCampo.value)) {
+      destDiv.appendChild(crearAvisoAutoVinculo());
+    }
+    if (seleccion.modelo) {
+      destDiv.appendChild(linkRegexPrincipal);
+      destDiv.appendChild(regexInputPrincipal);
+      destDiv.appendChild(previewPrincipal.el);
+    }
 
     row.appendChild(infoDiv);
     row.appendChild(arrowDiv);
     row.appendChild(destDiv);
 
+    // ── Destinos extra: la misma columna origen puede alimentar más de un
+    // campo/modelo (p. ej. "ID" completo → UnidadMuestreo.nombre, y solo una
+    // parte extraída por regex → UnidadExperimental.nombre). Acá solo se
+    // arma el destino (modelo + campo): una vez resuelto, deja de mostrarse
+    // en esta fila y pasa a renderizarse dentro de la sección de ese modelo
+    // (ver renderExtraRow), igual que cualquier otra columna mapeada.
+    const extrasWrap = document.createElement('div');
+    extrasWrap.style.cssText = 'padding:0 20px 12px;display:flex;flex-direction:column;gap:8px;';
+
+    const extrasPendientes = state.extrasDestino
+      .map((extra, extraIdx) => ({ extra, extraIdx }))
+      .filter(({ extra }) => extra.colIdx === idx && !(extra.modelo && extra.campo));
+
+    extrasPendientes.forEach(({ extra, extraIdx }) => {
+      const extraRow = document.createElement('div');
+      extraRow.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-left:10px;border-left:2px solid var(--border);';
+
+      const label = document.createElement('span');
+      label.style.cssText = 'font-size:.72rem;color:var(--gray);white-space:nowrap;';
+      label.textContent = '↳ también:';
+      extraRow.appendChild(label);
+
+      // A diferencia del destino principal (limitado a la sección actual),
+      // el destino extra puede apuntar a cualquier entidad del catálogo: no
+      // tiene por qué pertenecer a la misma sección que la columna origen.
+      const exModelo = document.createElement('select');
+      const todosLosModelos = Object.keys(state.modelosDestino);
+      const exModelosPorGrupo = new Map();
+      todosLosModelos.forEach(m => {
+        const grupoInfo = grupoDeModelo(m);
+        const etiqueta = grupoInfo ? `${grupoInfo.icono} ${grupoInfo.nombre}` : 'Otros';
+        if (!exModelosPorGrupo.has(etiqueta)) exModelosPorGrupo.set(etiqueta, []);
+        exModelosPorGrupo.get(etiqueta).push(m);
+      });
+      exModelo.innerHTML = '<option value="">— modelo —</option>' +
+        [...exModelosPorGrupo.entries()].map(([etiqueta, modelos]) => `
+          <optgroup label="${escapeHtml(etiqueta)}">
+            ${modelos.map(m => `<option value="${escapeHtml(m)}"${m === extra.modelo ? ' selected' : ''}>${escapeHtml(m)}</option>`).join('')}
+          </optgroup>
+        `).join('');
+
+      const exCampo = document.createElement('select');
+      const poblarExCampo = () => {
+        const campos = state.modelosDestino[exModelo.value] || [];
+        exCampo.innerHTML = '<option value="">— campo —</option>' +
+          campos.map(c => `<option value="${escapeHtml(c.nombre)}">${escapeHtml(c.verbose_name || c.nombre)}</option>`).join('');
+        exCampo.disabled = !exModelo.value;
+      };
+      poblarExCampo();
+
+      const btnQuitar = document.createElement('button');
+      btnQuitar.type = 'button';
+      btnQuitar.textContent = '✕';
+      btnQuitar.title = 'Quitar este destino extra';
+      btnQuitar.style.cssText = 'border:none;background:none;color:var(--gray);cursor:pointer;font-size:.85rem;';
+
+      exModelo.addEventListener('change', () => {
+        state.extrasDestino[extraIdx] = { ...state.extrasDestino[extraIdx], modelo: exModelo.value, campo: '' };
+        poblarExCampo();
+      });
+      // El campo recién elegido resuelve el destino: acá es donde la fila
+      // "se muda" a la sección de su modelo (renderMapeoRows la reagrupa).
+      exCampo.addEventListener('change', () => {
+        state.extrasDestino[extraIdx] = { ...state.extrasDestino[extraIdx], campo: exCampo.value };
+        renderMapeoRows();
+      });
+      btnQuitar.addEventListener('click', () => {
+        state.extrasDestino.splice(extraIdx, 1);
+        renderMapeoRows();
+      });
+
+      extraRow.appendChild(exModelo);
+      extraRow.appendChild(exCampo);
+      extraRow.appendChild(btnQuitar);
+      extrasWrap.appendChild(extraRow);
+    });
+
+    if (seleccion.modelo) {
+      const btnAgregar = document.createElement('button');
+      btnAgregar.type = 'button';
+      btnAgregar.textContent = '+ agregar otro destino';
+      btnAgregar.style.cssText = 'align-self:flex-start;border:none;background:none;color:var(--green);cursor:pointer;font-size:.78rem;font-weight:600;padding:2px 0;';
+      btnAgregar.addEventListener('click', () => {
+        state.extrasDestino.push({ colIdx: idx, modelo: '', campo: '', aplicarRegex: false, regexPatron: '' });
+        renderMapeoRows();
+      });
+      extrasWrap.appendChild(btnAgregar);
+    }
+
     wrapper.appendChild(row);
+    wrapper.appendChild(extrasWrap);
     wrapper.appendChild(choicesContainer);
     wrapper.appendChild(botonRevisarContainer);
+    return wrapper;
+  }
+
+  // Fila de un destino extra ya resuelto (modelo+campo elegidos): vive dentro
+  // de la sección de SU modelo, no de la columna origen. Muestra de dónde
+  // viene el valor (columna origen + muestra) y permite activar una
+  // transformación regex sobre ese mismo valor antes de guardarlo acá.
+  function renderExtraRow(extraIdx) {
+    const extra = state.extrasDestino[extraIdx];
+    const col = state.columnas[extra.colIdx];
+
+    const wrapper = document.createElement('div');
+    wrapper.style.borderBottom = '1px solid var(--border)';
+
+    const row = document.createElement('div');
+    row.className = 'mapeo-row';
+    row.style.borderBottom = 'none';
+
+    const muestra = (col.muestra || []).slice(0, 2).map(v => `"${v}"`).join(', ');
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'mapeo-col-info';
+    infoDiv.innerHTML = `
+      <div class="mapeo-col-name">
+        ↳ ${escapeHtml(col.nombre)}
+        <span class="mapeo-sugerido" style="background:var(--blue-l);color:var(--blue);" title="Esta columna ya tiene otro destino principal; este es un destino extra.">destino extra</span>
+      </div>
+      ${muestra ? `<div class="mapeo-sample">muestra: ${escapeHtml(muestra)}</div>` : ''}
+    `;
+
+    const arrowDiv = document.createElement('div');
+    arrowDiv.className = 'mapeo-arrow';
+    arrowDiv.textContent = '→';
+
+    const destDiv = document.createElement('div');
+    destDiv.className = 'mapeo-col-destino';
+    destDiv.style.flexWrap = 'wrap';
+
+    // El destino extra puede apuntar a cualquier entidad del catálogo, igual
+    // que en la fila principal: se muestra el mismo selector de modelo acá,
+    // no solo el de campo, para que quede claro (y editable) a qué entidad va.
+    const selModeloExtra = document.createElement('select');
+    const todosLosModelosExtra = Object.keys(state.modelosDestino);
+    const modelosPorGrupoExtra = new Map();
+    todosLosModelosExtra.forEach(m => {
+      const grupoInfo = grupoDeModelo(m);
+      const etiqueta = grupoInfo ? `${grupoInfo.icono} ${grupoInfo.nombre}` : 'Otros';
+      if (!modelosPorGrupoExtra.has(etiqueta)) modelosPorGrupoExtra.set(etiqueta, []);
+      modelosPorGrupoExtra.get(etiqueta).push(m);
+    });
+    selModeloExtra.innerHTML = [...modelosPorGrupoExtra.entries()].map(([etiqueta, modelos]) => `
+      <optgroup label="${escapeHtml(etiqueta)}">
+        ${modelos.map(m => `<option value="${escapeHtml(m)}"${m === extra.modelo ? ' selected' : ''}>${escapeHtml(m)}</option>`).join('')}
+      </optgroup>
+    `).join('');
+
+    const selCampo = document.createElement('select');
+    const poblarCampoExtra = () => {
+      const campos = state.modelosDestino[selModeloExtra.value] || [];
+      selCampo.innerHTML = campos
+        .filter(c => !ocultarOpcionUnidadExperimental(selModeloExtra.value, c.nombre, extra.campo))
+        .map(c => {
+          const etiqueta = escapeHtml(c.verbose_name || c.nombre) +
+            (esAutoVinculable(selModeloExtra.value, c.nombre) ? ' · se vincula solo' : '');
+          return `<option value="${escapeHtml(c.nombre)}"${c.nombre === extra.campo ? ' selected' : ''}>${etiqueta}</option>`;
+        }).join('');
+    };
+    poblarCampoExtra();
+
+    selModeloExtra.addEventListener('change', () => {
+      state.extrasDestino[extraIdx] = { ...state.extrasDestino[extraIdx], modelo: selModeloExtra.value, campo: '' };
+      renderMapeoRows();
+    });
+
+    selCampo.addEventListener('change', () => {
+      state.extrasDestino[extraIdx] = { ...state.extrasDestino[extraIdx], campo: selCampo.value };
+      renderMapeoRows();
+    });
+
+    const linkRegex = document.createElement('button');
+    linkRegex.type = 'button';
+    linkRegex.style.cssText = 'border:none;background:none;color:var(--green);cursor:pointer;font-size:.76rem;font-weight:600;white-space:nowrap;';
+    linkRegex.textContent = extra.aplicarRegex ? 'quitar regex' : '🧩 aplicar regex al campo';
+
+    const regexInput = document.createElement('input');
+    regexInput.type = 'text';
+    regexInput.placeholder = String.raw`^SWAMP_CO2_(.+?)_\d+$`;
+    regexInput.value = extra.regexPatron || '';
+    regexInput.style.cssText = 'min-width:200px;font-size:.78rem;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:monospace;';
+    regexInput.style.display = extra.aplicarRegex ? '' : 'none';
+
+    const previewExtra = crearVistaPreviaRegex(col);
+    previewExtra.el.style.display = extra.aplicarRegex ? '' : 'none';
+    if (extra.aplicarRegex) previewExtra.actualizar(regexInput.value);
+
+    regexInput.addEventListener('input', () => {
+      state.extrasDestino[extraIdx] = { ...state.extrasDestino[extraIdx], regexPatron: regexInput.value };
+      previewExtra.actualizar(regexInput.value);
+    });
+
+    linkRegex.addEventListener('click', () => {
+      const activar = !extra.aplicarRegex;
+      state.extrasDestino[extraIdx] = { ...state.extrasDestino[extraIdx], aplicarRegex: activar };
+      linkRegex.textContent = activar ? 'quitar regex' : '🧩 aplicar regex al campo';
+      regexInput.style.display = activar ? '' : 'none';
+      previewExtra.el.style.display = activar ? '' : 'none';
+      if (activar) {
+        regexInput.focus();
+        previewExtra.actualizar(regexInput.value);
+      }
+    });
+
+    const btnQuitar = document.createElement('button');
+    btnQuitar.type = 'button';
+    btnQuitar.textContent = '✕';
+    btnQuitar.title = 'Quitar este destino extra';
+    btnQuitar.style.cssText = 'border:none;background:none;color:var(--gray);cursor:pointer;font-size:.85rem;';
+    btnQuitar.addEventListener('click', () => {
+      state.extrasDestino.splice(extraIdx, 1);
+      renderMapeoRows();
+    });
+
+    destDiv.appendChild(selModeloExtra);
+    destDiv.appendChild(selCampo);
+    if (esAutoVinculable(selModeloExtra.value, selCampo.value)) {
+      destDiv.appendChild(crearAvisoAutoVinculo());
+    }
+    destDiv.appendChild(linkRegex);
+    destDiv.appendChild(regexInput);
+    destDiv.appendChild(btnQuitar);
+    destDiv.appendChild(previewExtra.el);
+
+    row.appendChild(infoDiv);
+    row.appendChild(arrowDiv);
+    row.appendChild(destDiv);
+    wrapper.appendChild(row);
     return wrapper;
   }
 
@@ -1910,6 +2283,128 @@
     return String(str)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ── Campos que ya se vinculan solos por fila ────────────────────────────
+  // UnidadMuestreo.unidad_experimental no necesita mapearse: al importar,
+  // _procesar_filas (app/api/etl/views.py) la completa con la Unidad
+  // Experimental creada para esa misma fila del archivo (ver el mensaje
+  // 💡 que arma el backend en /pages/etl-upload.html línea ~1240). Mapearla
+  // a mano es redundante (o puede pisar ese vínculo automático), así que acá
+  // se marca en la UI para que no sea fácil pasarlo por alto.
+  function esAutoVinculable(modelo, campo) {
+    return modelo === 'UnidadMuestreo' && campo === 'unidad_experimental';
+  }
+
+  function crearAvisoAutoVinculo() {
+    const aviso = document.createElement('div');
+    aviso.style.cssText = 'width:100%;font-size:.74rem;color:var(--blue);background:var(--blue-l);border:1px solid var(--blue);border-radius:6px;padding:6px 8px;margin-top:4px;';
+    aviso.textContent = '💡 Este campo se completa solo con la Unidad Experimental creada en la misma fila del archivo — normalmente no hace falta mapearlo a mano.';
+    return aviso;
+  }
+
+  // ── Vista previa de regex ────────────────────────────────────────────────
+  // Toma valores al azar de la columna origen (de los hasta 50 valores únicos
+  // que manda el backend, o de la muestra si no hay únicos) para que el
+  // usuario vea, mientras escribe el patrón, cómo quedaría cada valor.
+  function muestraAleatoria(col, n) {
+    const fuente = (col.valores_unicos && col.valores_unicos.length) ? col.valores_unicos : (col.muestra || []);
+    const copia = [...fuente];
+    for (let i = copia.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copia[i], copia[j]] = [copia[j], copia[i]];
+    }
+    return copia.slice(0, n);
+  }
+
+  // Misma lógica que _resolver_valor_columna en el backend (app/api/etl/views.py):
+  // re.search sobre el valor; sin match => null; con grupo de captura => group(1),
+  // si no => el match completo.
+  function aplicarRegexValor(patron, val) {
+    let regex;
+    try {
+      regex = new RegExp(patron);
+    } catch (e) {
+      return { estado: 'error', mensaje: 'Patrón inválido' };
+    }
+    const match = regex.exec(String(val));
+    if (!match) return { estado: 'sin-match' };
+    const resultado = (match.length > 1 && match[1] !== undefined) ? match[1] : match[0];
+    return { estado: 'ok', resultado };
+  }
+
+  // La vista previa corre en el navegador (motor de regex de JS), que sí
+  // acepta lookbehind "(?<=...)"/"(?<!...)" de ancho variable. Python (lo que
+  // realmente ejecuta el backend al guardar) lo rechaza con "look-behind
+  // requires fixed-width pattern". Se detecta acá para avisar antes de que el
+  // usuario llegue a "Validar y guardar" y se encuentre con ese error.
+  function advertenciaLookbehindPython(patron) {
+    const re = /\(\?<[=!]([^()]*)\)/g;
+    let m;
+    while ((m = re.exec(patron))) {
+      const contenido = m[1];
+      const anchoFijo = !/[*+]|\{\d*,(\d*)?\}/.test(contenido.replace(/\{(\d+)\}/g, ''));
+      if (!anchoFijo) {
+        return 'Este patrón usa un lookbehind "(?<=...)" de ancho variable. Se ve bien acá (vista previa en JS), pero Python — que es lo que corre al guardar — exige lookbehinds de ancho fijo y va a fallar con "look-behind requires fixed-width pattern".';
+      }
+    }
+    return null;
+  }
+
+  // Construye el panel de vista previa: 5 valores fijos (elegidos al azar una
+  // sola vez al abrirlo) y una función `actualizar(patron)` para recalcular
+  // el resultado de cada uno a medida que el usuario edita el regex.
+  function crearVistaPreviaRegex(col) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-top:8px;padding:10px 12px;background:var(--gray-l);border:1px solid var(--border);border-radius:8px;width:100%;';
+
+    const titulo = document.createElement('div');
+    titulo.style.cssText = 'font-size:.72rem;font-weight:700;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;';
+    titulo.textContent = '🔍 Vista previa (5 valores al azar)';
+    wrap.appendChild(titulo);
+
+    const avisoEl = document.createElement('div');
+    avisoEl.style.cssText = 'display:none;font-size:.74rem;color:var(--red);background:var(--red-l);border:1px solid var(--red);border-radius:6px;padding:6px 8px;margin-bottom:8px;';
+    wrap.appendChild(avisoEl);
+
+    const filasEl = document.createElement('div');
+    filasEl.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+    wrap.appendChild(filasEl);
+
+    const valores = muestraAleatoria(col, 5);
+
+    function actualizar(patron) {
+      const aviso = patron ? advertenciaLookbehindPython(patron) : null;
+      avisoEl.style.display = aviso ? '' : 'none';
+      avisoEl.textContent = aviso ? `⚠️ ${aviso}` : '';
+
+      filasEl.innerHTML = '';
+      if (!valores.length) {
+        filasEl.innerHTML = '<div style="font-size:.76rem;color:var(--gray);">No hay valores de muestra disponibles para esta columna.</div>';
+        return;
+      }
+      valores.forEach(v => {
+        const fila = document.createElement('div');
+        fila.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:.78rem;font-family:monospace;flex-wrap:wrap;';
+        let resultadoHtml;
+        if (!patron) {
+          resultadoHtml = `<span style="color:var(--gray);">— escribe un patrón —</span>`;
+        } else {
+          const r = aplicarRegexValor(patron, v);
+          if (r.estado === 'error') {
+            resultadoHtml = `<span style="color:var(--red);">${escapeHtml(r.mensaje)}</span>`;
+          } else if (r.estado === 'sin-match') {
+            resultadoHtml = `<span style="color:var(--red);">sin match → se guardaría vacío</span>`;
+          } else {
+            resultadoHtml = `<span style="color:var(--green);font-weight:600;">"${escapeHtml(r.resultado)}"</span>`;
+          }
+        }
+        fila.innerHTML = `<span style="color:var(--gray);">"${escapeHtml(v)}"</span><span>→</span>${resultadoHtml}`;
+        filasEl.appendChild(fila);
+      });
+    }
+
+    return { el: wrap, actualizar };
   }
 
   // ── Volver al paso 1 ──────────────────────────────────────────────────────
@@ -1931,7 +2426,7 @@
         mapeo_valores:   {},
       }));
 
-    return manuales.concat(state.columnas.map((col, idx) => {
+    const principales = state.columnas.map((col, idx) => {
       const seleccion = state.mapeoSeleccion[idx] || {};
       // Con selección pero sin modelo = "— ignorar —" elegido explícitamente;
       // se persiste como transformación 'ignorar' para no perder ese seguimiento.
@@ -1940,7 +2435,8 @@
         columna_origen:  col.nombre,
         modelo_destino:  seleccion.modelo || '',
         campo_destino:   seleccion.campo  || '',
-        transformacion:  ignorada ? 'ignorar' : 'directo',
+        transformacion:  ignorada ? 'ignorar' : (seleccion.aplicarRegex ? 'regex' : 'directo'),
+        regex_patron:    (!ignorada && seleccion.aplicarRegex) ? (seleccion.regexPatron || '') : '',
         // Se descartan los '' (ignorar explícito): solo persisten mapeos reales
         mapeo_valores:   Object.fromEntries(
           Object.entries(state.mapeoValores[idx] || {}).filter(([, v]) => v !== '')
@@ -1948,7 +2444,25 @@
         estrategia_nulos: seleccion.estrategiaNulos || 'dejar_null',
         valor_relleno_manual: seleccion.valorRellenoManual || '',
       };
-    }));
+    });
+
+    // Destinos extra (ver state.extrasDestino): cada uno es un mapeo
+    // independiente de la misma columna origen hacia otro modelo/campo,
+    // con su propia transformación (directo o regex).
+    const extras = state.extrasDestino
+      .filter(e => e.modelo && e.campo)
+      .map(e => ({
+        columna_origen:  state.columnas[e.colIdx].nombre,
+        modelo_destino:  e.modelo,
+        campo_destino:   e.campo,
+        transformacion:  e.aplicarRegex ? 'regex' : 'directo',
+        regex_patron:    e.aplicarRegex ? (e.regexPatron || '') : '',
+        mapeo_valores:   {},
+        estrategia_nulos: 'dejar_null',
+        valor_relleno_manual: '',
+      }));
+
+    return manuales.concat(principales, extras);
   }
 
   async function enviarMapeos(parcial) {

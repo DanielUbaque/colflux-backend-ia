@@ -102,6 +102,10 @@ class UnidadExperimental(TimestampedModel):
         related_name="unidades_experimentales", verbose_name="proyecto",
     )
     nombre = models.CharField("nombre", max_length=255)
+    tipo = models.ForeignKey(
+        UnidadMuestreoTipo, on_delete=models.PROTECT, related_name="unidades_experimentales",
+        null=True, blank=True, verbose_name="tipo",
+    )
     descripcion = models.TextField("descripción", blank=True)
 
     class Meta:
@@ -139,6 +143,9 @@ class UnidadMuestreo(TimestampedModel):
         FuenteDatos, on_delete=models.SET_NULL, related_name="unidades_muestreo",
         null=True, blank=True, verbose_name="fuente de datos",
     )
+    fecha_instalacion = models.DateField(
+        "fecha instalación unidad de muestreo", null=True, blank=True,
+    )
 
     class Meta:
         verbose_name = "unidad de muestreo"
@@ -150,15 +157,35 @@ class UnidadMuestreo(TimestampedModel):
 
 
 class Parcela(TimestampedModel):
-    """Detalle de una unidad de muestreo cuando su tipo es 'parcela' (dimensiones)."""
+    """Detalle de una unidad de muestreo cuando su tipo es 'parcela' (forma y dimensiones)."""
+
+    FORMA_CUADRADA = "Cuadrada"
+    FORMA_RECTANGULAR = "Rectangular"
+    FORMA_CIRCULAR = "Circular"
+    FORMA_CHOICES = [
+        (FORMA_CUADRADA, "Cuadrada"),
+        (FORMA_RECTANGULAR, "Rectangular"),
+        (FORMA_CIRCULAR, "Circular"),
+    ]
+    # Qué campo(s) de medida exige cada forma, para validar y calcular el área.
+    CAMPOS_MEDIDA_POR_FORMA = {
+        FORMA_CUADRADA: ("distancia",),
+        FORMA_RECTANGULAR: ("medida_largo", "medida_ancho"),
+        FORMA_CIRCULAR: ("diametro",),
+    }
 
     unidad_muestreo = models.OneToOneField(
         UnidadMuestreo, on_delete=models.CASCADE, related_name="parcela",
         null=True, blank=True, verbose_name="unidad de muestreo",
     )
+    forma = models.CharField("forma", max_length=15, choices=FORMA_CHOICES, blank=True)
     medida_largo = models.DecimalField("medida largo (m)", max_digits=10, decimal_places=2, null=True, blank=True)
     medida_ancho = models.DecimalField("medida ancho (m)", max_digits=10, decimal_places=2, null=True, blank=True)
-    area = models.DecimalField("área (m²)", max_digits=10, decimal_places=2, null=True, blank=True)
+    distancia = models.DecimalField("distancia / lado (m)", max_digits=10, decimal_places=2, null=True, blank=True)
+    diametro = models.DecimalField("diámetro (m)", max_digits=10, decimal_places=2, null=True, blank=True)
+    area = models.DecimalField(
+        "área (m²)", max_digits=10, decimal_places=2, null=True, blank=True, editable=False,
+    )
     descripcion = models.TextField("descripción", blank=True, default="")
 
     class Meta:
@@ -168,6 +195,46 @@ class Parcela(TimestampedModel):
 
     def __str__(self):
         return f"Parcela {self.pk}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if not self.forma:
+            return
+
+        campos_forma = self.CAMPOS_MEDIDA_POR_FORMA[self.forma]
+        faltantes = [c for c in campos_forma if getattr(self, c) is None]
+        if faltantes:
+            raise ValidationError(
+                f"Para una parcela {self.forma.lower()} se requiere: {', '.join(faltantes)}."
+            )
+
+        otros_campos = [
+            c for c in ("medida_largo", "medida_ancho", "distancia", "diametro")
+            if c not in campos_forma
+        ]
+        con_valor = [c for c in otros_campos if getattr(self, c) is not None]
+        if con_valor:
+            raise ValidationError(
+                f"Una parcela {self.forma.lower()} no debe tener: {', '.join(con_valor)}."
+            )
+
+    def _calcular_area(self):
+        if self.forma == self.FORMA_CUADRADA and self.distancia is not None:
+            return self.distancia ** 2
+        if self.forma == self.FORMA_RECTANGULAR and self.medida_largo is not None and self.medida_ancho is not None:
+            return self.medida_largo * self.medida_ancho
+        if self.forma == self.FORMA_CIRCULAR and self.diametro is not None:
+            from decimal import Decimal
+
+            radio = self.diametro / 2
+            return (Decimal("3.14159265") * radio * radio).quantize(Decimal("0.01"))
+        return None
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        self.area = self._calcular_area()
+        super().save(*args, **kwargs)
 
 
 class Transecto(TimestampedModel):

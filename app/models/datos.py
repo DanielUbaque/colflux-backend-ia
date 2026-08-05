@@ -150,6 +150,7 @@ class MapeoColumna(TimestampedModel):
         ("lookup", "Lookup / FK"),
         ("split", "Split"),
         ("fecha", "Parsear fecha"),
+        ("regex", "Expresión regular"),
         ("constante", "Valor constante"),
         ("ignorar", "Ignorar"),
     ]
@@ -173,6 +174,12 @@ class MapeoColumna(TimestampedModel):
         "valor constante", max_length=500, blank=True, default="",
         help_text="Valor fijo para todas las filas cuando la transformación es 'constante' (atributo sin columna en la fuente).",
     )
+    regex_patron = models.CharField(
+        "patrón regex", max_length=255, blank=True, default="",
+        help_text="Expresión regular aplicada al valor de origen cuando la transformación es 'regex'. Si tiene un "
+                   "grupo de captura se usa ese grupo; si no, se usa la coincidencia completa. Sin coincidencia, "
+                   "el valor queda vacío. Ej: '^SWAMP_CO2_(.+?)_\\d+$' sobre 'SWAMP_CO2_S1_old_3' da 'S1_old'.",
+    )
 
     ESTRATEGIA_NULOS_CHOICES = [
         ("dejar_null", "Dejar vacío"),
@@ -194,7 +201,12 @@ class MapeoColumna(TimestampedModel):
     class Meta:
         verbose_name = "mapeo de columna"
         verbose_name_plural = "mapeos de columnas"
-        unique_together = [("carga", "columna_origen")]
+        # Antes era único por (carga, columna_origen): una columna origen solo
+        # podía alimentar un destino. Se amplía a la tupla completa para poder
+        # mapear la misma columna a más de un modelo/campo (p. ej. una columna
+        # "ID" que sirve como nombre de UnidadExperimental -vía regex- y,
+        # completa, como nombre de UnidadMuestreo).
+        unique_together = [("carga", "columna_origen", "modelo_destino", "campo_destino")]
         ordering = ["columna_origen"]
 
     def __str__(self):
