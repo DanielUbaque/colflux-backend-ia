@@ -1,6 +1,7 @@
 from django.db import models
 
 from .base import TimestampedModel
+from .datos import FuenteDatos
 from .sitio import UnidadMuestreo
 from .torre import Equipo
 
@@ -69,6 +70,7 @@ class MuestraAmbiental(TimestampedModel):
         ("Hollow", "Hollow (depresiones húmedas)"),
         ("Pool", "Pool (charcos / sobre agua)"),
         ("Lawns", "Lawns (lugares planos)"),
+        ("Ditch", "Ditch (zanja / canal)"),
     ]
     MOMENTO_CHOICES = [
         ("inicio", "Inicio"),
@@ -88,18 +90,38 @@ class MuestraAmbiental(TimestampedModel):
     atm_press = models.DecimalField("presión atmosférica (hPa)", max_digits=8, decimal_places=2, null=True, blank=True)
     relat_humid = models.DecimalField("humedad relativa (%)", max_digits=5, decimal_places=2, null=True, blank=True)
     dew_point = models.DecimalField("punto de rocío (°C)", max_digits=6, decimal_places=2, null=True, blank=True)
-    microtopo = models.CharField("microtopografía", max_length=10, choices=MICROTOPO_CHOICES, blank=True)
-    # Permite cargar clima de forma independiente de una MuestraCO2 (p. ej.
-    # un archivo de estación meteorológica), ubicándolo en el espacio.
+    # Positivo = agua sobre la superficie (encharcamiento); negativo = nivel
+    # freático por debajo de la superficie. Mismo signo que se usa en la
+    # literatura de humedales/turberas para el nivel del agua.
+    water_level = models.DecimalField("nivel del agua (cm)", max_digits=6, decimal_places=2, null=True, blank=True)
+    microtopo = models.CharField("microtopología (microtopography)", max_length=10, choices=MICROTOPO_CHOICES, blank=True)
+    # Obligatorio: sin unidad de muestreo no se sabe a qué lugar corresponde
+    # la lectura. Permite cargar clima de forma independiente de una
+    # MuestraCO2 (p. ej. un archivo de estación meteorológica), pero siempre
+    # ubicado en el espacio.
     unidad_muestreo = models.ForeignKey(
         UnidadMuestreo, on_delete=models.PROTECT, related_name="muestras_ambientales",
-        null=True, blank=True, verbose_name="unidad de muestreo",
+        verbose_name="unidad de muestreo",
+    )
+    fuente_datos = models.ForeignKey(
+        FuenteDatos, on_delete=models.SET_NULL, related_name="muestras_ambientales",
+        null=True, blank=True, verbose_name="fuente de datos",
     )
 
     class Meta:
         verbose_name = "muestra ambiental"
         verbose_name_plural = "muestras ambientales"
         ordering = ["-fecha", "-hora"]
+        constraints = [
+            # Nota: con `hora` nula (como es casi todo el dato actual),
+            # Postgres no considera dos NULL iguales, así que esta
+            # restricción no evita duplicados en filas sin hora -solo
+            # protege una vez que la fuente empieza a traer hora real-.
+            models.UniqueConstraint(
+                fields=["fecha", "hora", "fuente_datos"],
+                name="muestra_ambiental_unica_por_fecha_hora_fuente",
+            ),
+        ]
 
     def __str__(self):
         return f"Muestra ambiental {self.pk}"

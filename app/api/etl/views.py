@@ -446,7 +446,7 @@ def campos_destino(request):
                     continue
                 if field.name in ("id", "created_at", "updated_at"):
                     continue
-                campos.append(campo_to_catalogo(field, proyecto=proyecto))
+                campos.append(campo_to_catalogo(field, proyecto=proyecto, incluir_instancias_fk=True))
             if campos:
                 modelos[nombre] = campos
                 grupos[nombre] = {
@@ -1174,6 +1174,33 @@ def _representar_kwargs(kwargs):
     return out
 
 
+# Campos que identifican de forma real a una fila de este modelo (más allá de
+# un OneToOneField), para usar en update_or_create en vez de que
+# get_or_create(**kwargs) use TODOS los campos mapeados como filtro -y
+# fragmente en duplicados apenas se mapee/agregue un campo nuevo, o se
+# rompa con "get() returned more than one" si varias filas ya comparten esos
+# valores por coincidencia-. Solo se usa cuando la fila trae valor real en
+# TODOS estos campos (ver el uso más abajo); si falta alguno, no hay forma
+# confiable de identificarla y se trata como en _MODELOS_EVENTO.
+_CAMPOS_IDENTIDAD = {
+    "UnidadMuestreo": ("nombre", "tipo", "unidad_experimental"),
+    # Mismo criterio que el UniqueConstraint de MuestraAmbiental en el
+    # modelo: identifica una lectura real solo si trae fecha Y hora (hora
+    # casi nunca viene cargada hoy, así que la mayoría de las filas caen en
+    # _MODELOS_EVENTO en vez de acá).
+    "MuestraAmbiental": ("fecha", "hora", "fuente_datos"),
+}
+
+# Modelos "evento": cada fila del archivo es una medición real distinta, no
+# un lugar/entidad que se busca y reutiliza (a diferencia de UnidadMuestreo,
+# UnidadExperimental o Sitio). Se usa como respaldo de _CAMPOS_IDENTIDAD: si
+# el modelo no tiene una identidad completa en esta fila, _procesar_filas lo
+# crea siempre, sin get_or_create -ver el comentario donde se usa este set-.
+# MuestraCO2 y SubmuestraCO2 son candidatos obvios a agregar acá el día que el
+# ETL los importe (hoy no se crean desde el wizard).
+_MODELOS_EVENTO = {"MuestraAmbiental"}
+
+
 def _procesar_filas(df, orden, mapeos_por_modelo, carga, resumen_modelos, capturar_detalle=False):
     """Recorre cada fila del archivo y crea/reutiliza (get_or_create /
     update_or_create) una instancia por modelo en `orden`, vinculando por FK
@@ -1247,19 +1274,46 @@ def _procesar_filas(df, orden, mapeos_por_modelo, carga, resumen_modelos, captur
             if modelo == "UnidadExperimental":
                 kwargs.setdefault("proyecto", carga.fuente.proyecto)
 
+            if modelo == "MuestraAmbiental":
+                kwargs.setdefault("fuente_datos", carga.fuente)
+
             # Si el modelo tiene un vínculo OneToOne (p. ej. Parcela →
             # unidad_muestreo), ese vínculo es su clave real: solo puede
-            # existir una fila por unidad, así que el resto de los
-            # campos se actualizan en vez de intentar crear otra fila
-            # (que violaría la restricción única).
+            # existir una fila por unidad, así que el resto de los campos
+            # se actualizan en vez de intentar crear otra fila (que
+            # violaría la restricción única).
             campos_clave = {
                 nombre: valor
                 for nombre, valor in kwargs.items()
                 if type(modelo_cls._meta.get_field(nombre)).__name__ == "OneToOneField"
             }
+            # Modelos sin OneToOne pero con una identidad propia definida acá
+            # (ver _CAMPOS_IDENTIDAD): solo se usa si TODOS esos campos vienen
+            # con valor real en esta fila -si falta alguno, no hay forma
+            # confiable de saber si es la misma fila que otra ya guardada-.
+            if not campos_clave and modelo in _CAMPOS_IDENTIDAD:
+                identidad = _CAMPOS_IDENTIDAD[modelo]
+                if all(kwargs.get(c) is not None for c in identidad):
+                    campos_clave = {c: kwargs[c] for c in identidad}
+
             if campos_clave:
                 defaults = {k: v for k, v in kwargs.items() if k not in campos_clave}
                 obj, creado = modelo_cls.objects.update_or_create(**campos_clave, defaults=defaults)
+            elif modelo in _MODELOS_EVENTO:
+                # A diferencia de UnidadMuestreo/UnidadExperimental/Sitio
+                # (lugares que se reutilizan entre filas y cargas), cada fila
+                # de un modelo "evento" es una medición real distinta -dos
+                # lecturas pueden compartir todos sus valores mapeados sin
+                # ser la misma-. Sin una identidad completa (ver arriba),
+                # buscar "si ya existe" con get_or_create() puede fusionar
+                # lecturas distintas por coincidencia, o romper con
+                # "get() returned more than one" cuando ya hay varias con
+                # esos mismos valores. Se crea siempre una fila nueva; si se
+                # re-sube el mismo archivo dos veces, se duplican las
+                # lecturas que no tengan la identidad completa (fecha+hora
+                # acá), igual que no las protege el UniqueConstraint en BD.
+                obj = modelo_cls.objects.create(**kwargs)
+                creado = True
             else:
                 obj, creado = modelo_cls.objects.get_or_create(**kwargs)
 

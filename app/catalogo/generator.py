@@ -132,14 +132,21 @@ def fk_choices(field, proyecto=None):
         return []
 
 
-def campo_to_catalogo(field, proyecto=None):
+def campo_to_catalogo(field, proyecto=None, incluir_instancias_fk=False):
+    """`incluir_instancias_fk` solo debe pedirlo el ETL (campos_destino), que
+    necesita ofrecer instancias reales ya cargadas (p. ej. qué UnidadMuestreo
+    ya existen) para que el usuario elija una al mapear una columna. El
+    catálogo público (modelo_to_catalogo/docs) documenta el *tipo* de dato
+    -qué modelo referencia un FK, qué opciones tiene un choices= estático-,
+    no instancias creadas dinámicamente al cargar datos: UnidadMuestreo,
+    UnidadExperimental, etc. no son parte del tipado, son datos de negocio."""
     tipo_raw = field.__class__.__name__
     es_fk = tipo_raw == "ForeignKey"
     choices = [
         {"valor": valor, "etiqueta": etiqueta}
         for valor, etiqueta in (getattr(field, "choices", None) or [])
     ]
-    if es_fk and not choices:
+    if es_fk and not choices and incluir_instancias_fk:
         choices = fk_choices(field, proyecto=proyecto)
     return {
         "nombre": field.name,
