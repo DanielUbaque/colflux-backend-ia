@@ -11,11 +11,14 @@ from .sitio import (
 
 from .proyecto import Institucion, Proyecto, ProyectoInstitucion, ProyectoUsuario
 
-from .torre import ConfiguracionSensorGas, Equipo, TorreEc, TorreFuenteEnergia
+from .torre import ConfiguracionSensorGas, TorreEc, TorreFuenteEnergia
 
 from .suelo import CaracterizacionMuestreoSuelo, MonitoreoSuelo
 
-from .co2 import Anillo, Camara, MuestraAmbiental, MuestraCO2, SubmuestraCO2, UnidadMedida
+from .co2 import (
+    Anillo, Equipo, MuestraAmbiental, MuestraCO2, SubmuestraCO2,
+    TipoMuestra, UnidadMedida,
+)
 
 from .publicacion import Autor, Publicacion, PublicacionAutor, PublicacionSitio, PublicacionType, ResultadoPublicacion
 
@@ -49,7 +52,6 @@ __all__ = [
     "ProyectoUsuario",
     # Torre EC
     "ConfiguracionSensorGas",
-    "Equipo",
     "TorreEc",
     "TorreFuenteEnergia",
     # Suelo
@@ -57,7 +59,8 @@ __all__ = [
     "MonitoreoSuelo",
     # Muestras CO₂
     "UnidadMedida",
-    "Camara",
+    "Equipo",
+    "TipoMuestra",
     "Anillo",
     "MuestraAmbiental",
     "MuestraCO2",

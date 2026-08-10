@@ -3,7 +3,6 @@ from django.db import models
 from .base import TimestampedModel
 from .datos import FuenteDatos
 from .sitio import UnidadMuestreo
-from .torre import Equipo
 
 
 class UnidadMedida(TimestampedModel):
@@ -25,22 +24,49 @@ class UnidadMedida(TimestampedModel):
         return self.codigo
 
 
-class Camara(TimestampedModel):
-    """Cámara/sensor móvil conectado a un equipo (picarro). No pertenece a una parcela."""
+class Equipo(TimestampedModel):
+    """Equipo analizador (picarro, EGM, Licor, …) con modelo y serial."""
 
-    codigo = models.CharField("código", max_length=40)
+    modelo = models.CharField("modelo", max_length=120, blank=True)
+    serial = models.CharField("serial", max_length=120, blank=True)
+    descripcion = models.CharField("descripción", max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = "equipo"
+        verbose_name_plural = "equipos"
+        ordering = ["modelo"]
+
+    def __str__(self):
+        return f"{self.modelo} ({self.serial})" if self.serial else self.modelo
+
+
+class TipoMuestra(TimestampedModel):
+    """Qué gas puede medir un equipo y en qué unidad (p. ej. Picarro G4301 → CO₂ en µmol m⁻² s⁻¹)."""
+
+    GAS_CHOICES = [
+        ("CO2", "CO₂"),
+        ("CH4", "CH₄"),
+        ("N2O", "N₂O"),
+    ]
+
     equipo = models.ForeignKey(
-        Equipo, on_delete=models.PROTECT, related_name="camaras",
-        verbose_name="equipo (picarro)",
+        Equipo, on_delete=models.CASCADE, related_name="tipos_muestra",
+        verbose_name="equipo",
+    )
+    gas = models.CharField("gas", max_length=4, choices=GAS_CHOICES)
+    unidad_medida = models.ForeignKey(
+        UnidadMedida, on_delete=models.PROTECT, related_name="tipos_muestra",
+        verbose_name="unidad de medida",
     )
 
     class Meta:
-        verbose_name = "cámara"
-        verbose_name_plural = "cámaras"
-        ordering = ["codigo"]
+        verbose_name = "tipo de muestra"
+        verbose_name_plural = "tipos de muestra"
+        ordering = ["equipo", "gas"]
+        unique_together = [("equipo", "gas")]
 
     def __str__(self):
-        return f"Cámara {self.codigo}"
+        return f"{self.equipo} — {self.get_gas_display()} ({self.unidad_medida})"
 
 
 class Anillo(TimestampedModel):
@@ -128,18 +154,17 @@ class MuestraAmbiental(TimestampedModel):
 
 
 class MuestraCO2(TimestampedModel):
-    """Evento de medición de flujo de CO₂: una cámara conectada a un anillo."""
+    """Evento de medición de flujo de CO₂: un equipo analizador conectado a un tubo."""
 
     # Temporalmente opcionales: el ETL todavía no tiene forma de crear/vincular
-    # Anillo ni Camara (Camara depende de Equipo, cuya sección "Torre EC y
-    # Flujos" está oculta del wizard). Volver a null=False cuando se resuelva.
-    anillo = models.ForeignKey(
+    # Anillo. Volver a null=False cuando se resuelva.
+    tubo = models.ForeignKey(
         Anillo, on_delete=models.PROTECT, related_name="muestras_co2",
-        null=True, blank=True, verbose_name="anillo",
+        null=True, blank=True, verbose_name="tubo",
     )
-    camara = models.ForeignKey(
-        Camara, on_delete=models.PROTECT, related_name="muestras_co2",
-        null=True, blank=True, verbose_name="cámara",
+    analizador = models.ForeignKey(
+        Equipo, on_delete=models.PROTECT, related_name="muestras_co2",
+        null=True, blank=True, verbose_name="analizador",
     )
     # Vínculo directo a UnidadMuestreo: el ETL todavía no crea/vincula Anillo
     # (ver comentario arriba), así que por ahora la unidad de muestreo de una
@@ -154,15 +179,23 @@ class MuestraCO2(TimestampedModel):
         MuestraAmbiental, on_delete=models.SET_NULL, related_name="muestras_co2",
         null=True, blank=True, verbose_name="muestra ambiental",
     )
+    # Unidad reportada por la fuente para esta muestra (todas sus submuestras
+    # la comparten, vienen del mismo equipo/carga). No se asume del equipo:
+    # TipoMuestra solo indica la unidad *habitual* de un equipo/gas, pero la
+    # fuente puede reportar en otra — por eso se guarda explícita aquí.
+    unidad_medida = models.ForeignKey(
+        UnidadMedida, on_delete=models.PROTECT, related_name="muestras_co2",
+        null=True, blank=True, verbose_name="unidad de medida",
+    )
 
     class Meta:
         verbose_name = "muestra CO₂"
         verbose_name_plural = "muestras CO₂"
         ordering = ["-fecha", "-created_at"]
-        indexes = [models.Index(fields=["anillo"]), models.Index(fields=["camara"])]
+        indexes = [models.Index(fields=["tubo"]), models.Index(fields=["analizador"])]
 
     def __str__(self):
-        return f"Muestra CO₂ {self.pk} — {self.anillo}"
+        return f"Muestra CO₂ {self.pk} — {self.tubo}"
 
 
 class SubmuestraCO2(TimestampedModel):
@@ -183,14 +216,11 @@ class SubmuestraCO2(TimestampedModel):
         verbose_name="muestra CO₂",
     )
     n_toma = models.PositiveSmallIntegerField("número de toma", null=True, blank=True)
+    fecha = models.DateField("fecha de la toma", null=True, blank=True)
     hora = models.TimeField("hora de la toma", null=True, blank=True)
     momento = models.CharField("momento", max_length=10, choices=MOMENTO_CHOICES, blank=True)
     condicion_luz = models.CharField("condición de luz", max_length=15, choices=CONDICION_LUZ_CHOICES, blank=True)
     valor = models.DecimalField("valor del flujo", max_digits=14, decimal_places=6, null=True, blank=True)
-    unidad_medida = models.ForeignKey(
-        UnidadMedida, on_delete=models.PROTECT, related_name="submuestras_co2",
-        null=True, blank=True, verbose_name="unidad de medida",
-    )
 
     class Meta:
         verbose_name = "submuestra CO₂"
@@ -199,3 +229,9 @@ class SubmuestraCO2(TimestampedModel):
 
     def __str__(self):
         return f"Toma {self.n_toma} — Muestra {self.muestra_id}"
+
+    @property
+    def unidad_medida(self):
+        """No se guarda por toma: todas las tomas de una muestra comparten la
+        misma unidad, reportada por la fuente en MuestraCO2.unidad_medida."""
+        return self.muestra.unidad_medida

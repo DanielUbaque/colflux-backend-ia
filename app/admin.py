@@ -146,8 +146,7 @@ class TorreFuenteEnergiaAdmin(admin.ModelAdmin):
 
 @admin.register(Equipo)
 class EquipoAdmin(admin.ModelAdmin):
-    list_display = ("tipo_equipo", "modelo", "serial", "torre")
-    list_filter = ("tipo_equipo",)
+    list_display = ("modelo", "serial", "descripcion")
     search_fields = ("modelo", "serial")
 
 

@@ -82,9 +82,17 @@ for _grupo in GRUPOS_CATALOGO:
             "entidades": ["MuestraAmbiental"],
         })
     elif _grupo["nombre"] == "Muestras CO₂":
+        # UnidadMedida, Equipo, TipoMuestra y Anillo no se muestran como
+        # sección propia: son catálogos que se cargan aparte (o entidades sin
+        # flujo de creación desde el ETL todavía), no datos fila por fila del
+        # archivo. Sus valores igual se pueden asignar a MuestraCO2 (campos
+        # unidad_medida, analizador, tubo) como atributo fijo/columna dentro
+        # de la sección MuestraCO2 misma — mismo criterio que UnidadMuestreoTipo
+        # más arriba.
+        _EXCLUIDAS_MUESTRAS_CO2 = ("MuestraAmbiental", "UnidadMedida", "Equipo", "TipoMuestra", "Anillo")
         SECCIONES_ETL.append({
             **_grupo,
-            "entidades": [e for e in _grupo["entidades"] if e != "MuestraAmbiental"],
+            "entidades": [e for e in _grupo["entidades"] if e not in _EXCLUIDAS_MUESTRAS_CO2],
         })
     else:
         SECCIONES_ETL.append(_grupo)
@@ -1577,22 +1585,26 @@ def importar_carga(request, fuente_id, carga_id):
 #
 # "submuestra_co2" llega a UnidadMuestreo/UnidadExperimental/Sitio por el
 # vínculo directo MuestraCO2.unidad_muestreo, sin pasar por Anillo: el ETL
-# todavía no crea/vincula Anillo (Camara depende de Equipo, cuya sección
-# "Torre EC y Flujos" está oculta del wizard), y la relación anillo →
-# unidad_muestreo queda pendiente de revisar a futuro (ver app/models/co2.py).
+# todavía no crea/vincula Anillo, y la relación anillo → unidad_muestreo
+# queda pendiente de revisar a futuro (ver app/models/co2.py).
 # "unidad_muestreo" es una vista aparte para cargas que todavía no tienen
 # MuestraCO2/SubmuestraCO2 importadas (solo unidad de muestreo/experimental).
+#
+# SubmuestraCO2 ya no tiene un campo `unidad_medida` propio (todas sus tomas
+# comparten la unidad reportada por la fuente para la muestra completa): el
+# campo vive en MuestraCO2.unidad_medida (ver app/models/co2.py). TipoMuestra
+# (equipo → gas → unidad habitual) es solo catálogo de referencia, no la
+# fuente de este dato.
 _VISTAS_DESNORMALIZADAS = {
     "submuestra_co2": {
         "modelo_base": "SubmuestraCO2",
         "orden": ["muestra__fecha", "muestra_id", "n_toma"],
         "cadena": [
             ("SubmuestraCO2", []),
-            ("UnidadMedida", ["unidad_medida"]),
             ("MuestraCO2", ["muestra"]),
+            ("UnidadMedida", ["muestra", "unidad_medida"]),
             ("MuestraAmbiental", ["muestra", "muestra_ambiental"]),
-            ("Camara", ["muestra", "camara"]),
-            ("Equipo", ["muestra", "camara", "equipo"]),
+            ("Equipo", ["muestra", "analizador"]),
             ("UnidadMuestreo", ["muestra", "unidad_muestreo"]),
             ("UnidadExperimental", ["muestra", "unidad_muestreo", "unidad_experimental"]),
             ("Sitio", ["muestra", "unidad_muestreo", "sitio"]),

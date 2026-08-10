@@ -1,6 +1,7 @@
 from django.db import models
 
 from .base import TimestampedModel
+from .co2 import Equipo
 from .sitio import Sitio
 
 
@@ -28,34 +29,6 @@ class ConfiguracionSensorGas(TimestampedModel):
 
     def __str__(self):
         return f"{self.gas} — Torre {self.torre_id}"
-
-
-class Equipo(TimestampedModel):
-    """Equipo instalado en una torre EC (anemómetro, analizadores de gas, adquisición, …) con modelo y serial."""
-
-    TIPO_CHOICES = [
-        ("Anemometro", "Anemómetro"),
-        ("Analizador_CO2", "Analizador CO₂"),
-        ("Analizador_CH4", "Analizador CH₄"),
-        ("Adquisicion", "Adquisición"),
-        ("Retencion", "Retención"),
-        ("Procesamiento", "Procesamiento"),
-        ("Biomet", "Biomet"),
-        ("Estacion_Complementaria", "Estación complementaria"),
-    ]
-
-    torre = models.ForeignKey("TorreEc", on_delete=models.CASCADE, related_name="equipos")
-    tipo_equipo = models.CharField("tipo de equipo", max_length=30, choices=TIPO_CHOICES)
-    modelo = models.CharField("modelo", max_length=120, blank=True)
-    serial = models.CharField("serial", max_length=120, blank=True)
-
-    class Meta:
-        verbose_name = "equipo"
-        verbose_name_plural = "equipos"
-        ordering = ["torre", "tipo_equipo"]
-
-    def __str__(self):
-        return f"{self.get_tipo_equipo_display()} {self.modelo} — Torre {self.torre_id}"
 
 
 class TorreEc(TimestampedModel):

@@ -2272,92 +2272,6 @@
           ]
         },
         {
-          "nombre": "Equipo",
-          "verbose_name": "equipo",
-          "verbose_name_plural": "equipos",
-          "descripcion": "Equipo instalado en una torre EC (anemómetro, analizadores de gas, adquisición, …) con modelo y serial.",
-          "total_campos": 4,
-          "campos": [
-            {
-              "nombre": "torre",
-              "verbose_name": "torre",
-              "tipo": "FK (relación)",
-              "tipo_raw": "ForeignKey",
-              "requerido": true,
-              "max_length": null,
-              "choices": [],
-              "es_fk": true,
-              "modelo_fk": "TorreEc"
-            },
-            {
-              "nombre": "tipo_equipo",
-              "verbose_name": "tipo de equipo",
-              "tipo": "Texto",
-              "tipo_raw": "CharField",
-              "requerido": true,
-              "max_length": 30,
-              "choices": [
-                {
-                  "valor": "Anemometro",
-                  "etiqueta": "Anemómetro"
-                },
-                {
-                  "valor": "Analizador_CO2",
-                  "etiqueta": "Analizador CO₂"
-                },
-                {
-                  "valor": "Analizador_CH4",
-                  "etiqueta": "Analizador CH₄"
-                },
-                {
-                  "valor": "Adquisicion",
-                  "etiqueta": "Adquisición"
-                },
-                {
-                  "valor": "Retencion",
-                  "etiqueta": "Retención"
-                },
-                {
-                  "valor": "Procesamiento",
-                  "etiqueta": "Procesamiento"
-                },
-                {
-                  "valor": "Biomet",
-                  "etiqueta": "Biomet"
-                },
-                {
-                  "valor": "Estacion_Complementaria",
-                  "etiqueta": "Estación complementaria"
-                }
-              ],
-              "es_fk": false,
-              "modelo_fk": null
-            },
-            {
-              "nombre": "modelo",
-              "verbose_name": "modelo",
-              "tipo": "Texto",
-              "tipo_raw": "CharField",
-              "requerido": false,
-              "max_length": 120,
-              "choices": [],
-              "es_fk": false,
-              "modelo_fk": null
-            },
-            {
-              "nombre": "serial",
-              "verbose_name": "serial",
-              "tipo": "Texto",
-              "tipo_raw": "CharField",
-              "requerido": false,
-              "max_length": 120,
-              "choices": [],
-              "es_fk": false,
-              "modelo_fk": null
-            }
-          ]
-        },
-        {
           "nombre": "ConfiguracionSensorGas",
           "verbose_name": "configuración sensor de gas",
           "verbose_name_plural": "configuraciones sensores de gas",
@@ -2502,29 +2416,106 @@
               "es_fk": false,
               "modelo_fk": null
             }
+          ],
+          "datos_semilla": [
+            {
+              "id": 1,
+              "codigo": "g_m2_h",
+              "descripcion": "gramos por metro cuadrado por hora",
+              "magnitud": "flujo"
+            },
+            {
+              "id": 3,
+              "codigo": "nmol_m2_s",
+              "descripcion": "nanomoles por metro cuadrado por segundo",
+              "magnitud": "flujo"
+            },
+            {
+              "id": 2,
+              "codigo": "umol_m2_s",
+              "descripcion": "micromoles por metro cuadrado por segundo",
+              "magnitud": "flujo"
+            }
           ]
         },
         {
-          "nombre": "Camara",
-          "verbose_name": "cámara",
-          "verbose_name_plural": "cámaras",
-          "descripcion": "Cámara/sensor móvil conectado a un equipo (picarro). No pertenece a una parcela.",
-          "total_campos": 2,
+          "nombre": "Equipo",
+          "verbose_name": "equipo",
+          "verbose_name_plural": "equipos",
+          "descripcion": "Equipo analizador (picarro, EGM, Licor, …) con modelo y serial.",
+          "total_campos": 3,
           "campos": [
             {
-              "nombre": "codigo",
-              "verbose_name": "código",
+              "nombre": "modelo",
+              "verbose_name": "modelo",
               "tipo": "Texto",
               "tipo_raw": "CharField",
-              "requerido": true,
-              "max_length": 40,
+              "requerido": false,
+              "max_length": 120,
               "choices": [],
               "es_fk": false,
               "modelo_fk": null
             },
             {
+              "nombre": "serial",
+              "verbose_name": "serial",
+              "tipo": "Texto",
+              "tipo_raw": "CharField",
+              "requerido": false,
+              "max_length": 120,
+              "choices": [],
+              "es_fk": false,
+              "modelo_fk": null
+            },
+            {
+              "nombre": "descripcion",
+              "verbose_name": "descripción",
+              "tipo": "Texto",
+              "tipo_raw": "CharField",
+              "requerido": false,
+              "max_length": 255,
+              "choices": [],
+              "es_fk": false,
+              "modelo_fk": null
+            }
+          ],
+          "datos_semilla": [
+            {
+              "id": 1,
+              "modelo": "EGM-4",
+              "serial": "",
+              "descripcion": ""
+            },
+            {
+              "id": 2,
+              "modelo": "EGM-5",
+              "serial": "",
+              "descripcion": ""
+            },
+            {
+              "id": 4,
+              "modelo": "Licor 7810",
+              "serial": "",
+              "descripcion": ""
+            },
+            {
+              "id": 3,
+              "modelo": "Picarro G4301",
+              "serial": "",
+              "descripcion": ""
+            }
+          ]
+        },
+        {
+          "nombre": "TipoMuestra",
+          "verbose_name": "tipo de muestra",
+          "verbose_name_plural": "tipos de muestra",
+          "descripcion": "Qué gas puede medir un equipo y en qué unidad (p. ej. Picarro G4301 → CO₂ en µmol m⁻² s⁻¹).",
+          "total_campos": 3,
+          "campos": [
+            {
               "nombre": "equipo",
-              "verbose_name": "equipo (picarro)",
+              "verbose_name": "equipo",
               "tipo": "FK (relación)",
               "tipo_raw": "ForeignKey",
               "requerido": true,
@@ -2532,6 +2523,79 @@
               "choices": [],
               "es_fk": true,
               "modelo_fk": "Equipo"
+            },
+            {
+              "nombre": "gas",
+              "verbose_name": "gas",
+              "tipo": "Texto",
+              "tipo_raw": "CharField",
+              "requerido": true,
+              "max_length": 4,
+              "choices": [
+                {
+                  "valor": "CO2",
+                  "etiqueta": "CO₂"
+                },
+                {
+                  "valor": "CH4",
+                  "etiqueta": "CH₄"
+                },
+                {
+                  "valor": "N2O",
+                  "etiqueta": "N₂O"
+                }
+              ],
+              "es_fk": false,
+              "modelo_fk": null
+            },
+            {
+              "nombre": "unidad_medida",
+              "verbose_name": "unidad de medida",
+              "tipo": "FK (relación)",
+              "tipo_raw": "ForeignKey",
+              "requerido": true,
+              "max_length": null,
+              "choices": [],
+              "es_fk": true,
+              "modelo_fk": "UnidadMedida"
+            }
+          ],
+          "datos_semilla": [
+            {
+              "id": 1,
+              "equipo": "EGM-4",
+              "gas": "CO2",
+              "unidad_medida": "g_m2_h"
+            },
+            {
+              "id": 2,
+              "equipo": "EGM-5",
+              "gas": "CO2",
+              "unidad_medida": "g_m2_h"
+            },
+            {
+              "id": 5,
+              "equipo": "Licor 7810",
+              "gas": "CH4",
+              "unidad_medida": "nmol_m2_s"
+            },
+            {
+              "id": 6,
+              "equipo": "Licor 7810",
+              "gas": "CO2",
+              "unidad_medida": "umol_m2_s"
+            },
+            {
+              "id": 3,
+              "equipo": "Picarro G4301",
+              "gas": "CH4",
+              "unidad_medida": "umol_m2_s"
+            },
+            {
+              "id": 4,
+              "equipo": "Picarro G4301",
+              "gas": "CO2",
+              "unidad_medida": "umol_m2_s"
             }
           ]
         },
@@ -2752,12 +2816,12 @@
           "nombre": "MuestraCO2",
           "verbose_name": "muestra CO₂",
           "verbose_name_plural": "muestras CO₂",
-          "descripcion": "Evento de medición de flujo de CO₂: una cámara conectada a un anillo.",
-          "total_campos": 5,
+          "descripcion": "Evento de medición de flujo de CO₂: un equipo analizador conectado a un tubo.",
+          "total_campos": 6,
           "campos": [
             {
-              "nombre": "anillo",
-              "verbose_name": "anillo",
+              "nombre": "tubo",
+              "verbose_name": "tubo",
               "tipo": "FK (relación)",
               "tipo_raw": "ForeignKey",
               "requerido": false,
@@ -2767,15 +2831,15 @@
               "modelo_fk": "Anillo"
             },
             {
-              "nombre": "camara",
-              "verbose_name": "cámara",
+              "nombre": "analizador",
+              "verbose_name": "analizador",
               "tipo": "FK (relación)",
               "tipo_raw": "ForeignKey",
               "requerido": false,
               "max_length": null,
               "choices": [],
               "es_fk": true,
-              "modelo_fk": "Camara"
+              "modelo_fk": "Equipo"
             },
             {
               "nombre": "unidad_muestreo",
@@ -2809,6 +2873,17 @@
               "choices": [],
               "es_fk": true,
               "modelo_fk": "MuestraAmbiental"
+            },
+            {
+              "nombre": "unidad_medida",
+              "verbose_name": "unidad de medida",
+              "tipo": "FK (relación)",
+              "tipo_raw": "ForeignKey",
+              "requerido": false,
+              "max_length": null,
+              "choices": [],
+              "es_fk": true,
+              "modelo_fk": "UnidadMedida"
             }
           ]
         },
@@ -2835,6 +2910,17 @@
               "verbose_name": "número de toma",
               "tipo": "PositiveSmallIntegerField",
               "tipo_raw": "PositiveSmallIntegerField",
+              "requerido": false,
+              "max_length": null,
+              "choices": [],
+              "es_fk": false,
+              "modelo_fk": null
+            },
+            {
+              "nombre": "fecha",
+              "verbose_name": "fecha de la toma",
+              "tipo": "Fecha",
+              "tipo_raw": "DateField",
               "requerido": false,
               "max_length": null,
               "choices": [],
@@ -2906,17 +2992,6 @@
               "choices": [],
               "es_fk": false,
               "modelo_fk": null
-            },
-            {
-              "nombre": "unidad_medida",
-              "verbose_name": "unidad de medida",
-              "tipo": "FK (relación)",
-              "tipo_raw": "ForeignKey",
-              "requerido": false,
-              "max_length": null,
-              "choices": [],
-              "es_fk": true,
-              "modelo_fk": "UnidadMedida"
             }
           ]
         }

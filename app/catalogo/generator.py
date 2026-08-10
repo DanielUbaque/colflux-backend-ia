@@ -38,12 +38,15 @@ GRUPOS_CATALOGO = [
     {
         "nombre": "Torre EC y Flujos",
         "icono": "📡",
-        "entidades": ["TorreEc", "Equipo", "ConfiguracionSensorGas"],
+        "entidades": ["TorreEc", "ConfiguracionSensorGas"],
     },
     {
         "nombre": "Muestras CO₂",
         "icono": "🫧",
-        "entidades": ["UnidadMedida", "Camara", "Anillo", "MuestraAmbiental", "MuestraCO2", "SubmuestraCO2"],
+        "entidades": [
+            "UnidadMedida", "Equipo", "TipoMuestra", "Anillo",
+            "MuestraAmbiental", "MuestraCO2", "SubmuestraCO2",
+        ],
     },
     {
         "nombre": "Proyecto",
@@ -61,6 +64,9 @@ ENTIDADES_SEMILLA = {
     "PublicacionType",
     "Region",
     "Departamento",
+    "UnidadMedida",
+    "Equipo",
+    "TipoMuestra",
 }
 
 TIPO_MAP = {

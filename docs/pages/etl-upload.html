@@ -1009,16 +1009,24 @@
     return mejor;
   }
 
+  // "micro" es el prefijo SI que "µ"/"u" abrevian (micromol = µmol = umol):
+  // normaliza ambas formas al mismo texto para que el matching de unidades
+  // (p. ej. "micromol_m2_s" con el catálogo "umol_m2_s") no dependa de que
+  // la fuente use la forma abreviada.
+  function normalizarUnidad(s) {
+    return normalizarNombre(s).replace(/\bmicro/g, 'u');
+  }
+
   // Igual que sugerirMapeo pero contra las opciones (choices) de un campo:
   // coincidencia exacta del valor o la etiqueta normalizados, o inclusión mutua.
   function sugerirValor(valorOrigen, choices) {
-    const n = normalizarNombre(valorOrigen);
+    const n = normalizarUnidad(valorOrigen);
     if (!n) return null;
 
     let mejor = null;
     choices.forEach(ch => {
       let score = 0;
-      [normalizarNombre(ch.valor), normalizarNombre(ch.etiqueta)].forEach(cand => {
+      [normalizarUnidad(ch.valor), normalizarUnidad(ch.etiqueta)].forEach(cand => {
         if (!cand) return;
         if (cand === n) score = Math.max(score, 2);
         else if (cand.length >= 4 && n.length >= 4 && (cand.includes(n) || n.includes(cand))) {
@@ -1782,6 +1790,19 @@
     selModelo.dataset.idx = idx;
     selModelo.classList.add('sel-modelo');
 
+    // Una columna "sin decidir" (sin entrada en mapeoSeleccion) necesita un
+    // value propio, distinto de '' (= "— ignorar —" explícito). Si compartieran
+    // value, el <select> ya mostraría "ignorar" seleccionado para una columna
+    // sin decidir, y elegir esa misma opción no dispara 'change' en el
+    // navegador (el value no cambia) — la columna nunca se movía a "Ignoradas".
+    const SIN_DECIDIR = '__sin_decidir__';
+    if (!state.mapeoSeleccion[idx]) {
+      const optSinDecidir = document.createElement('option');
+      optSinDecidir.value = SIN_DECIDIR; optSinDecidir.textContent = '— seleccionar —';
+      optSinDecidir.disabled = true; optSinDecidir.hidden = true;
+      selModelo.appendChild(optSinDecidir);
+    }
+
     const optIgnorar = document.createElement('option');
     optIgnorar.value = ''; optIgnorar.textContent = '— ignorar —';
     selModelo.appendChild(optIgnorar);
@@ -1804,7 +1825,7 @@
       });
       selModelo.appendChild(og);
     });
-    selModelo.value = seleccion.modelo || '';
+    selModelo.value = state.mapeoSeleccion[idx] ? (seleccion.modelo || '') : SIN_DECIDIR;
 
     const selCampo = document.createElement('select');
     selCampo.dataset.idx = idx;
