@@ -2600,48 +2600,6 @@
           ]
         },
         {
-          "nombre": "Anillo",
-          "verbose_name": "anillo",
-          "verbose_name_plural": "anillos",
-          "descripcion": "Anillo fijo instalado en la unidad de muestreo.",
-          "total_campos": 3,
-          "campos": [
-            {
-              "nombre": "unidad_muestreo",
-              "verbose_name": "unidad de muestreo",
-              "tipo": "FK (relación)",
-              "tipo_raw": "ForeignKey",
-              "requerido": true,
-              "max_length": null,
-              "choices": [],
-              "es_fk": true,
-              "modelo_fk": "UnidadMuestreo"
-            },
-            {
-              "nombre": "diametro",
-              "verbose_name": "diámetro (cm)",
-              "tipo": "Decimal",
-              "tipo_raw": "DecimalField",
-              "requerido": false,
-              "max_length": null,
-              "choices": [],
-              "es_fk": false,
-              "modelo_fk": null
-            },
-            {
-              "nombre": "volumen",
-              "verbose_name": "volumen (cm³)",
-              "tipo": "Decimal",
-              "tipo_raw": "DecimalField",
-              "requerido": false,
-              "max_length": null,
-              "choices": [],
-              "es_fk": false,
-              "modelo_fk": null
-            }
-          ]
-        },
-        {
           "nombre": "MuestraAmbiental",
           "verbose_name": "muestra ambiental",
           "verbose_name_plural": "muestras ambientales",
@@ -2817,18 +2775,18 @@
           "verbose_name": "muestra CO₂",
           "verbose_name_plural": "muestras CO₂",
           "descripcion": "Evento de medición de flujo de CO₂: un equipo analizador conectado a un tubo.",
-          "total_campos": 6,
+          "total_campos": 4,
           "campos": [
             {
               "nombre": "tubo",
               "verbose_name": "tubo",
-              "tipo": "FK (relación)",
-              "tipo_raw": "ForeignKey",
+              "tipo": "Texto",
+              "tipo_raw": "CharField",
               "requerido": false,
-              "max_length": null,
+              "max_length": 80,
               "choices": [],
-              "es_fk": true,
-              "modelo_fk": "Anillo"
+              "es_fk": false,
+              "modelo_fk": null
             },
             {
               "nombre": "analizador",
@@ -2851,28 +2809,6 @@
               "choices": [],
               "es_fk": true,
               "modelo_fk": "UnidadMuestreo"
-            },
-            {
-              "nombre": "fecha",
-              "verbose_name": "fecha",
-              "tipo": "Fecha",
-              "tipo_raw": "DateField",
-              "requerido": false,
-              "max_length": null,
-              "choices": [],
-              "es_fk": false,
-              "modelo_fk": null
-            },
-            {
-              "nombre": "muestra_ambiental",
-              "verbose_name": "muestra ambiental",
-              "tipo": "FK (relación)",
-              "tipo_raw": "ForeignKey",
-              "requerido": false,
-              "max_length": null,
-              "choices": [],
-              "es_fk": true,
-              "modelo_fk": "MuestraAmbiental"
             },
             {
               "nombre": "unidad_medida",

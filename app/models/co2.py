@@ -69,25 +69,6 @@ class TipoMuestra(TimestampedModel):
         return f"{self.equipo} — {self.get_gas_display()} ({self.unidad_medida})"
 
 
-class Anillo(TimestampedModel):
-    """Anillo fijo instalado en la unidad de muestreo."""
-
-    unidad_muestreo = models.ForeignKey(
-        UnidadMuestreo, on_delete=models.PROTECT, related_name="anillos",
-        verbose_name="unidad de muestreo",
-    )
-    diametro = models.DecimalField("diámetro (cm)", max_digits=8, decimal_places=2, null=True, blank=True)
-    volumen = models.DecimalField("volumen (cm³)", max_digits=12, decimal_places=2, null=True, blank=True)
-
-    class Meta:
-        verbose_name = "anillo"
-        verbose_name_plural = "anillos"
-        ordering = ["unidad_muestreo", "pk"]
-
-    def __str__(self):
-        return f"Anillo {self.pk} — {self.unidad_muestreo}"
-
-
 class MuestraAmbiental(TimestampedModel):
     """Contexto ambiental (biomet) asociado a una muestra de CO₂."""
 
@@ -156,28 +137,14 @@ class MuestraAmbiental(TimestampedModel):
 class MuestraCO2(TimestampedModel):
     """Evento de medición de flujo de CO₂: un equipo analizador conectado a un tubo."""
 
-    # Temporalmente opcionales: el ETL todavía no tiene forma de crear/vincular
-    # Anillo. Volver a null=False cuando se resuelva.
-    tubo = models.ForeignKey(
-        Anillo, on_delete=models.PROTECT, related_name="muestras_co2",
-        null=True, blank=True, verbose_name="tubo",
-    )
+    tubo = models.CharField("tubo", max_length=80, blank=True)
     analizador = models.ForeignKey(
         Equipo, on_delete=models.PROTECT, related_name="muestras_co2",
         null=True, blank=True, verbose_name="analizador",
     )
-    # Vínculo directo a UnidadMuestreo: el ETL todavía no crea/vincula Anillo
-    # (ver comentario arriba), así que por ahora la unidad de muestreo de una
-    # MuestraCO2 se mapea/hereda directo, sin pasar por el anillo. La relación
-    # anillo → unidad_muestreo queda pendiente de revisar a futuro.
     unidad_muestreo = models.ForeignKey(
         UnidadMuestreo, on_delete=models.PROTECT, related_name="muestras_co2",
         null=True, blank=True, verbose_name="unidad de muestreo",
-    )
-    fecha = models.DateField("fecha", null=True, blank=True)
-    muestra_ambiental = models.ForeignKey(
-        MuestraAmbiental, on_delete=models.SET_NULL, related_name="muestras_co2",
-        null=True, blank=True, verbose_name="muestra ambiental",
     )
     # Unidad reportada por la fuente para esta muestra (todas sus submuestras
     # la comparten, vienen del mismo equipo/carga). No se asume del equipo:
@@ -191,8 +158,8 @@ class MuestraCO2(TimestampedModel):
     class Meta:
         verbose_name = "muestra CO₂"
         verbose_name_plural = "muestras CO₂"
-        ordering = ["-fecha", "-created_at"]
-        indexes = [models.Index(fields=["tubo"]), models.Index(fields=["analizador"])]
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["analizador"])]
 
     def __str__(self):
         return f"Muestra CO₂ {self.pk} — {self.tubo}"

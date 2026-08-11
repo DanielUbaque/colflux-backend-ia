@@ -126,7 +126,9 @@ class UnidadExperimental(TimestampedModel):
 class UnidadMuestreo(TimestampedModel):
     """Lugar/objeto desde el cual se toma la muestra. Su tipo sale del catálogo."""
 
-    nombre = models.CharField("nombre", max_length=255)
+    # Indexado: es el identificador natural de la unidad (p. ej. "3"), usado
+    # para encontrar/crear la unidad correspondiente en cada fila del ETL.
+    nombre = models.CharField("nombre", max_length=255, db_index=True)
     tipo = models.ForeignKey(
         UnidadMuestreoTipo, on_delete=models.PROTECT, related_name="unidades_muestreo",
         verbose_name="tipo",

@@ -44,7 +44,7 @@ GRUPOS_CATALOGO = [
         "nombre": "Muestras CO₂",
         "icono": "🫧",
         "entidades": [
-            "UnidadMedida", "Equipo", "TipoMuestra", "Anillo",
+            "UnidadMedida", "Equipo", "TipoMuestra",
             "MuestraAmbiental", "MuestraCO2", "SubmuestraCO2",
         ],
     },
@@ -112,7 +112,6 @@ def semilla_rows(modelo_cls):
 _FILTRO_PROYECTO_POR_MODELO = {
     "UnidadExperimental": "proyecto",
     "UnidadMuestreo": "unidad_experimental__proyecto",
-    "Anillo": "unidad_muestreo__unidad_experimental__proyecto",
     "MuestraAmbiental": "unidad_muestreo__unidad_experimental__proyecto",
     "MuestraCO2": "unidad_muestreo__unidad_experimental__proyecto",
 }

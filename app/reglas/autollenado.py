@@ -43,12 +43,12 @@ def _candidatos_hora_submuestra_co2(parametros):
         SubmuestraCO2.objects
         .exclude(condicion_luz="")
         .select_related("muestra")
-        .order_by("muestra__fecha", "muestra_id", "n_toma")
+        .order_by("fecha", "muestra_id", "n_toma")
     )
 
     referencia_por_fecha = {}
     for sub in todas:
-        fecha = sub.muestra.fecha
+        fecha = sub.fecha
         if fecha is not None and sub.hora is not None and fecha not in referencia_por_fecha:
             referencia_por_fecha[fecha] = sub.hora
 
@@ -57,7 +57,7 @@ def _candidatos_hora_submuestra_co2(parametros):
     for sub in todas:
         if sub.hora is not None:
             continue
-        fecha = sub.muestra.fecha
+        fecha = sub.fecha
         referencia = referencia_por_fecha.get(fecha) if fecha is not None else None
         if referencia is not None:
             base = referencia
