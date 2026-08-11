@@ -8,7 +8,7 @@ from app.api.etl.views import (
     archivo_fuente, campos_destino, datos_carga, datos_proyecto, exportar_carga, importar_carga, mapeo_carga,
     previsualizar_carga, upload_archivo, validar_carga,
 )
-from app.api.geo.views import sitios_geojson
+from app.api.geo.views import series_co2, sitios_geojson
 from app.api.institucion.views import InstitucionViewSet
 from app.api.proyecto.views import ProyectoViewSet
 from app.api.reglas.views import (
@@ -54,5 +54,6 @@ urlpatterns = [
     path("api/reglas-autollenado/<str:codigo>/aplicar/", aplicar_regla_autollenado, name="reglas-autollenado-aplicar"),
     path("api/reglas-autollenado/lotes/<uuid:lote_id>/deshacer/", deshacer_lote_autollenado, name="reglas-autollenado-deshacer"),
     path("api/geo/sitios/", sitios_geojson, name="geo-sitios"),
+    path("api/geo/series/", series_co2, name="geo-series"),
     path("", include(router.urls)),
 ]
