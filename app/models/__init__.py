@@ -16,7 +16,7 @@ from .torre import ConfiguracionSensorGas, TorreEc, TorreFuenteEnergia
 from .suelo import CaracterizacionMuestreoSuelo, MonitoreoSuelo
 
 from .co2 import (
-    Equipo, MuestraAmbiental, MuestraCO2, SubmuestraCO2,
+    Equipo, MuestraAmbiental, MuestraGEI, SubmuestraGEI,
     TipoMuestra, UnidadMedida,
 )
 
@@ -57,13 +57,13 @@ __all__ = [
     # Suelo
     "CaracterizacionMuestreoSuelo",
     "MonitoreoSuelo",
-    # Muestras CO₂
+    # Muestras GEI
     "UnidadMedida",
     "Equipo",
     "TipoMuestra",
     "MuestraAmbiental",
-    "MuestraCO2",
-    "SubmuestraCO2",
+    "MuestraGEI",
+    "SubmuestraGEI",
     # Gestión de datos
     "Usuario",
     "RolUsuario",

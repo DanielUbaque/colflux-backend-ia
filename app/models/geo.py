@@ -37,7 +37,8 @@ class Departamento(TimestampedModel):
 
     DEPARTAMENTO_CHOICES = [
         ("Amazonas", "Amazonas"), ("Antioquia", "Antioquia"), ("Arauca", "Arauca"),
-        ("Atlantico", "Atlántico"), ("Bolivar", "Bolívar"), ("Boyaca", "Boyacá"),
+        ("Atlantico", "Atlántico"), ("Bogota_DC", "Bogotá, D.C."), ("Bolivar", "Bolívar"),
+        ("Boyaca", "Boyacá"),
         ("Caldas", "Caldas"), ("Caqueta", "Caquetá"), ("Casanare", "Casanare"),
         ("Cauca", "Cauca"), ("Cesar", "Cesar"), ("Choco", "Chocó"),
         ("Cordoba", "Córdoba"), ("Cundinamarca", "Cundinamarca"), ("Guainia", "Guainía"),
@@ -55,6 +56,7 @@ class Departamento(TimestampedModel):
         "código DANE", max_length=2, unique=True, null=True, blank=True
     )
     region = models.ForeignKey(Region, on_delete=models.PROTECT, related_name="departamentos")
+    geom = models.JSONField("geometría (GeoJSON)", null=True, blank=True)
 
     class Meta:
         verbose_name = "departamento"
@@ -73,6 +75,7 @@ class Municipio(TimestampedModel):
         "código DANE", max_length=5, unique=True, null=True, blank=True
     )
     departamento = models.ForeignKey(Departamento, on_delete=models.PROTECT, related_name="municipios")
+    geom = models.JSONField("geometría (GeoJSON)", null=True, blank=True)
 
     class Meta:
         verbose_name = "municipio"

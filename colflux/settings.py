@@ -53,27 +53,25 @@ TEMPLATES = [
 WSGI_APPLICATION = "colflux.wsgi.application"
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-if DATABASE_URL:
-    from urllib.parse import urlparse
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL no está seteada. Este proyecto usa Postgres vía Docker "
+        "(ver docker-compose.yml) — no hay fallback a sqlite."
+    )
 
-    db = urlparse(DATABASE_URL)
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": db.path.lstrip("/"),
-            "USER": db.username,
-            "PASSWORD": db.password,
-            "HOST": db.hostname,
-            "PORT": db.port or 5432,
-        }
+from urllib.parse import urlparse
+
+db = urlparse(DATABASE_URL)
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": db.path.lstrip("/"),
+        "USER": db.username,
+        "PASSWORD": db.password,
+        "HOST": db.hostname,
+        "PORT": db.port or 5432,
     }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

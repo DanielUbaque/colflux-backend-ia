@@ -223,7 +223,7 @@ path("api/fuentes-datos/<int:fuente_id>/carga/<int:carga_id>/importar/", views.i
 
 **Qué**: exportar los registros que se importaron tal como quedaron en BD — con las columnas
 del modelo Django y los valores canónicos (no el archivo original). Un único `.xlsx` con
-una pestaña por cada vista desnormalizada (`submuestra_co2`, `unidad_muestreo`), igual a como
+una pestaña por cada vista desnormalizada (`submuestra_gei`, `unidad_muestreo`), igual a como
 se ven en `etl-datos.html`.
 
 **Endpoint**:

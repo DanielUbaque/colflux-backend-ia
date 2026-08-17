@@ -18,29 +18,29 @@ from django.db.models import Count, Max, Min
 from django.db.models.functions import ExtractHour
 from django.utils import timezone
 
-from app.models import AplicacionRegla, ReglaAutollenado, SubmuestraCO2
+from app.models import AplicacionRegla, ReglaAutollenado, SubmuestraGEI
 
 
 def _parsear_hora(valor):
     return datetime.strptime(valor, "%H:%M").time()
 
 
-def _candidatos_hora_submuestra_co2(parametros):
-    """SubmuestraCO2.hora nula: si ya existe alguna toma con hora conocida
+def _candidatos_hora_submuestra_gei(parametros):
+    """SubmuestraGEI.hora nula: si ya existe alguna toma con hora conocida
     para la misma fecha (de cualquier muestra), esa hora se usa como
     referencia para todas las tomas sin hora de ese día, en vez del valor
     por defecto. Si no hay ninguna hora de referencia para la fecha, se
     infiere de `condicion_luz` de la propia toma (día → `hora_dia`,
     noche/noche simulada → `hora_noche`). En ambos casos, las tomas que
     comparten la misma base (misma fecha con referencia, o misma
-    MuestraCO2 sin ella) se separan `incremento_minutos` entre sí (en
+    MuestraGEI sin ella) se separan `incremento_minutos` entre sí (en
     orden de `n_toma`) para no repetir la hora."""
     hora_dia = _parsear_hora(parametros["hora_dia"])
     hora_noche = _parsear_hora(parametros["hora_noche"])
     incremento = int(parametros["incremento_minutos"])
 
     todas = (
-        SubmuestraCO2.objects
+        SubmuestraGEI.objects
         .exclude(condicion_luz="")
         .select_related("muestra")
         .order_by("fecha", "muestra_id", "n_toma")
@@ -84,11 +84,11 @@ def _candidatos_hora_submuestra_co2(parametros):
     return candidatos
 
 
-def _contar_pendientes_hora_submuestra_co2():
-    """Cuenta cuántas SubmuestraCO2 tienen `hora` nula (mismo filtro que
-    `_candidatos_hora_submuestra_co2`, pero sin traer ni procesar filas: solo
+def _contar_pendientes_hora_submuestra_gei():
+    """Cuenta cuántas SubmuestraGEI tienen `hora` nula (mismo filtro que
+    `_candidatos_hora_submuestra_gei`, pero sin traer ni procesar filas: solo
     para saber cuántas hay pendientes, p. ej. para el badge de la UI)."""
-    return SubmuestraCO2.objects.exclude(condicion_luz="").filter(hora__isnull=True).count()
+    return SubmuestraGEI.objects.exclude(condicion_luz="").filter(hora__isnull=True).count()
 
 
 CASOS_ETIQUETAS = {
@@ -122,13 +122,13 @@ def _agrupar_por_caso(candidatos):
     ]
 
 
-def _validar_hora_submuestra_co2():
-    """Rango (mín/máx) de `hora` ya asignada en SubmuestraCO2, agrupado por
+def _validar_hora_submuestra_gei():
+    """Rango (mín/máx) de `hora` ya asignada en SubmuestraGEI, agrupado por
     condición de luz, más un histograma por hora del día (0-23). Sirve para
     detectar a simple vista horas fuera de lo esperado (p. ej. una toma
     'noche' con hora de mediodía)."""
-    etiquetas = dict(SubmuestraCO2.CONDICION_LUZ_CHOICES)
-    base = SubmuestraCO2.objects.exclude(condicion_luz="").filter(hora__isnull=False)
+    etiquetas = dict(SubmuestraGEI.CONDICION_LUZ_CHOICES)
+    base = SubmuestraGEI.objects.exclude(condicion_luz="").filter(hora__isnull=False)
 
     resumen = (
         base
@@ -160,7 +160,7 @@ def _validar_hora_submuestra_co2():
 
 
 REGLAS = {
-    "hora_submuestra_co2": {
+    "hora_submuestra_gei": {
         "nombre": "Hora de toma faltante",
         "descripcion": (
             "Si ya hay una toma con hora conocida en la misma fecha, esa hora se usa como referencia para "
@@ -169,7 +169,7 @@ REGLAS = {
             "condición de luz. Entre tomas que comparten la misma base, suma el incremento configurado por "
             "cada una para no repetir la hora."
         ),
-        "modelo_destino": "SubmuestraCO2",
+        "modelo_destino": "SubmuestraGEI",
         "campo_destino": "hora",
         "parametros_default": {"hora_dia": "12:00", "hora_noche": "00:00", "incremento_minutos": 3},
         "parametros_schema": [
@@ -177,9 +177,9 @@ REGLAS = {
             {"clave": "hora_noche", "etiqueta": "Hora base — condición de luz 'noche' / 'noche simulada'", "tipo": "time"},
             {"clave": "incremento_minutos", "etiqueta": "Incremento entre tomas de la misma muestra (minutos)", "tipo": "number"},
         ],
-        "calcular_candidatos": _candidatos_hora_submuestra_co2,
-        "contar_pendientes": _contar_pendientes_hora_submuestra_co2,
-        "validar_valores": _validar_hora_submuestra_co2,
+        "calcular_candidatos": _candidatos_hora_submuestra_gei,
+        "contar_pendientes": _contar_pendientes_hora_submuestra_gei,
+        "validar_valores": _validar_hora_submuestra_gei,
     },
 }
 

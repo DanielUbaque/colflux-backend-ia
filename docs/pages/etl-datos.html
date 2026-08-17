@@ -240,20 +240,20 @@
   const dropdownData = { proyectos: [], fuentes: [] };
 
   const NOMBRES_VISTA = {
-    submuestra_co2: 'Muestras CO₂ (detalle)',
+    submuestra_gei: 'Muestras GEI (detalle)',
     unidad_muestreo: 'Unidad de Muestreo / Experimental',
     clima: 'Clima',
   };
 
   const state = {
-    vista: 'submuestra_co2', offset: 0, limite: 200, total: 0, columnas: [], filas: [], filtros: {},
+    vista: 'submuestra_gei', offset: 0, limite: 200, total: 0, columnas: [], filas: [], filtros: {},
     vistasDisponibles: [], reglas: {},
   };
 
   // Colores por modelo, para agrupar visualmente las columnas de la tabla
-  // (cada modelo de la cadena SubmuestraCO2 → … → Sitio tiene su color).
+  // (cada modelo de la cadena SubmuestraGEI → … → Sitio tiene su color).
   const COLORES_MODELO = {
-    SubmuestraCO2: '#0d4f40', MuestraCO2: '#18735d', UnidadMedida: '#1a6e9b',
+    SubmuestraGEI: '#0d4f40', MuestraGEI: '#18735d', UnidadMedida: '#1a6e9b',
     MuestraAmbiental: '#6b4f9e', Equipo: '#b45309',
     UnidadMuestreo: '#1a6e9b', UnidadExperimental: '#166534',
     UnidadMuestreoTipo: '#65a30d', Sitio: '#7c3aed',

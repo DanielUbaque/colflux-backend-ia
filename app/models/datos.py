@@ -130,7 +130,7 @@ class CargaArchivo(TimestampedModel):
     pks_importados = models.JSONField(
         "pks creados/vinculados por esta carga", default=dict, blank=True,
         help_text='Acumula, por modelo, los pk que esta carga creó o reutilizó al importar. '
-                   'Ej: {"SubmuestraCO2": [10, 11, 12]}. Permite mostrar solo los datos de esta carga en el panel de visualización.',
+                   'Ej: {"SubmuestraGEI": [10, 11, 12]}. Permite mostrar solo los datos de esta carga en el panel de visualización.',
     )
 
     class Meta:

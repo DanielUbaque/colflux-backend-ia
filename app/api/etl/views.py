@@ -38,7 +38,7 @@ from app.catalogo.generator import GRUPOS_CATALOGO, campo_to_catalogo, fk_choice
 # - Excluye temporalmente "Cobertura y Vegetación", "Suelo", "Torre EC y
 #   Flujos", "Proyecto" y "Usuarios, Roles y ETL": todavía no se está
 #   mapeando/importando esas entidades desde el ETL. Por ahora el wizard
-#   llega hasta "Muestras CO₂". Quitar de esta lista cuando se retome cada
+#   llega hasta "Muestras GEI". Quitar de esta lista cuando se retome cada
 #   una.
 _GRUPOS_EXCLUIDOS_TEMPORAL = (
     "Cobertura y Vegetación",
@@ -72,8 +72,8 @@ for _grupo in GRUPOS_CATALOGO:
             "icono": "📍",
             "entidades": ["Sitio"],
         })
-        # Clima (MuestraAmbiental) se saca de "Muestras CO₂" para poder
-        # cargarse solo, sin depender de tener también datos de CO₂ en el
+        # Clima (MuestraAmbiental) se saca de "Muestras GEI" para poder
+        # cargarse solo, sin depender de tener también datos de GEI en el
         # mismo archivo — solo necesita que ya exista la Unidad de Muestreo
         # a la que se va a vincular, por eso va justo después de "Sitio".
         SECCIONES_ETL.append({
@@ -81,17 +81,17 @@ for _grupo in GRUPOS_CATALOGO:
             "icono": "🌦️",
             "entidades": ["MuestraAmbiental"],
         })
-    elif _grupo["nombre"] == "Muestras CO₂":
+    elif _grupo["nombre"] == "Muestras GEI":
         # UnidadMedida, Equipo y TipoMuestra no se muestran como sección
         # propia: son catálogos que se cargan aparte, no datos fila por fila
-        # del archivo. Sus valores igual se pueden asignar a MuestraCO2
+        # del archivo. Sus valores igual se pueden asignar a MuestraGEI
         # (campos unidad_medida, analizador) como atributo fijo/columna dentro
-        # de la sección MuestraCO2 misma — mismo criterio que UnidadMuestreoTipo
+        # de la sección MuestraGEI misma — mismo criterio que UnidadMuestreoTipo
         # más arriba.
-        _EXCLUIDAS_MUESTRAS_CO2 = ("MuestraAmbiental", "UnidadMedida", "Equipo", "TipoMuestra")
+        _EXCLUIDAS_MUESTRAS_GEI = ("MuestraAmbiental", "UnidadMedida", "Equipo", "TipoMuestra")
         SECCIONES_ETL.append({
             **_grupo,
-            "entidades": [e for e in _grupo["entidades"] if e not in _EXCLUIDAS_MUESTRAS_CO2],
+            "entidades": [e for e in _grupo["entidades"] if e not in _EXCLUIDAS_MUESTRAS_GEI],
         })
     else:
         SECCIONES_ETL.append(_grupo)
@@ -464,6 +464,97 @@ def campos_destino(request):
                 }
                 orden_modelo += 1
     return JsonResponse({"modelos": modelos, "grupos": grupos}, json_dumps_params={"ensure_ascii": False})
+
+
+# Campos donde tiene sentido "¿ya existe esto en el proyecto?": ambos se
+# identifican por nombre dentro del proyecto (UnidadMuestreo vía su
+# UnidadExperimental), que es justo lo que un regex de extracción intenta
+# reproducir para reusar el registro en vez de duplicarlo.
+_RESOLVERS_EXISTENCIA = {
+    ("UnidadExperimental", "nombre"): lambda proyecto_id, valores: set(
+        apps.get_model("app", "UnidadExperimental")
+        .objects.filter(proyecto_id=proyecto_id, nombre__in=valores)
+        .values_list("nombre", flat=True)
+    ),
+    ("UnidadMuestreo", "nombre"): lambda proyecto_id, valores: set(
+        apps.get_model("app", "UnidadMuestreo")
+        .objects.filter(unidad_experimental__proyecto_id=proyecto_id, nombre__in=valores)
+        .values_list("nombre", flat=True)
+    ),
+}
+
+
+@csrf_exempt
+def verificar_existencia(request):
+    """Para valores ya resueltos en el navegador (p. ej. el resultado de aplicar
+    un regex), dice cuáles coinciden con un registro que ya existe en el
+    proyecto de la fuente. Se usa en la vista previa del regex del paso 2 para
+    avisar si el mapeo actual va a reutilizar una unidad existente o crear una
+    nueva. Solo soporta los campos de `_RESOLVERS_EXISTENCIA`; el resto
+    responde `soportado: false` para que el frontend no muestre nada.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    fuente_id = body.get("fuente_id")
+    modelo = body.get("modelo", "")
+    campo = body.get("campo", "")
+    valores = [str(v) for v in (body.get("valores") or []) if str(v).strip()]
+
+    resolver = _RESOLVERS_EXISTENCIA.get((modelo, campo))
+    if not fuente_id or not valores or not resolver:
+        return JsonResponse({"existentes": [], "soportado": bool(resolver)})
+
+    proyecto_id = FuenteDatos.objects.filter(pk=fuente_id).values_list("proyecto_id", flat=True).first()
+    if not proyecto_id:
+        return JsonResponse({"existentes": [], "soportado": True})
+
+    existentes = resolver(proyecto_id, set(valores))
+    return JsonResponse({"existentes": sorted(existentes), "soportado": True})
+
+
+def regex_sugerido(request):
+    """Busca, dentro del mismo proyecto, el último regex que otra carga ya usó
+    para llenar el mismo campo destino (p. ej. `UnidadExperimental.nombre`) y
+    lo propone como punto de partida. Evita que cada carga nueva del mismo
+    proyecto tenga que redescubrir a mano el patrón que separa sus columnas
+    compuestas (ej. `SWAMP_<gas>_<unidad>_<n>`).
+    """
+    fuente_id = request.GET.get("fuente")
+    modelo = request.GET.get("modelo", "")
+    campo = request.GET.get("campo", "")
+    if not fuente_id or not modelo or not campo:
+        return JsonResponse({"regex_patron": None})
+
+    proyecto_id = FuenteDatos.objects.filter(pk=fuente_id).values_list("proyecto_id", flat=True).first()
+    if not proyecto_id:
+        return JsonResponse({"regex_patron": None})
+
+    mapeo = (
+        MapeoColumna.objects
+        .filter(
+            carga__fuente__proyecto_id=proyecto_id,
+            modelo_destino=modelo,
+            campo_destino=campo,
+            transformacion="regex",
+        )
+        .exclude(regex_patron="")
+        .order_by("-created_at")
+        .values("regex_patron", "columna_origen", "carga__fuente__nombre")
+        .first()
+    )
+    if not mapeo:
+        return JsonResponse({"regex_patron": None})
+
+    return JsonResponse({
+        "regex_patron": mapeo["regex_patron"],
+        "columna_origen": mapeo["columna_origen"],
+        "fuente_nombre": mapeo["carga__fuente__nombre"],
+    }, json_dumps_params={"ensure_ascii": False})
 
 
 @csrf_exempt
@@ -1203,7 +1294,7 @@ _CAMPOS_IDENTIDAD = {
 # UnidadExperimental o Sitio). Se usa como respaldo de _CAMPOS_IDENTIDAD: si
 # el modelo no tiene una identidad completa en esta fila, _procesar_filas lo
 # crea siempre, sin get_or_create -ver el comentario donde se usa este set-.
-# MuestraCO2 y SubmuestraCO2 son candidatos obvios a agregar acá el día que el
+# MuestraGEI y SubmuestraGEI son candidatos obvios a agregar acá el día que el
 # ETL los importe (hoy no se crean desde el wizard).
 _MODELOS_EVENTO = {"MuestraAmbiental"}
 
@@ -1466,6 +1557,14 @@ def previsualizar_carga(request, fuente_id, carga_id):
             modelo: {
                 "registros": list(bucket.values()),
                 "total": resumen_modelos[modelo]["creados"] + resumen_modelos[modelo]["reutilizados"],
+                # Conteo real (sobre TODAS las filas, no solo las de la
+                # muestra de `bucket`, que está recortada a
+                # _PREVIEW_MAX_POR_MODELO para no mandar miles de filas al
+                # navegador). El frontend debe mostrar estos, no derivarlos
+                # de `registros` — con archivos grandes, la muestra recortada
+                # no representa la proporción real de nuevos/reutilizados.
+                "creados": resumen_modelos[modelo]["creados"],
+                "reutilizados": resumen_modelos[modelo]["reutilizados"],
                 "truncado": (resumen_modelos[modelo]["creados"] + resumen_modelos[modelo]["reutilizados"]) > len(bucket),
             }
             for modelo, bucket in (detalle or {}).items()
@@ -1582,24 +1681,24 @@ def importar_carga(request, fuente_id, carga_id):
 # se aplana en columnas prefijadas por modelo. Cada tupla de la cadena es
 # (nombre_modelo, ruta_de_atributos_desde_el_modelo_base).
 #
-# "submuestra_co2" llega a UnidadMuestreo/UnidadExperimental/Sitio por el
-# vínculo directo MuestraCO2.unidad_muestreo. "unidad_muestreo" es una vista
-# aparte para cargas que todavía no tienen MuestraCO2/SubmuestraCO2
+# "submuestra_gei" llega a UnidadMuestreo/UnidadExperimental/Sitio por el
+# vínculo directo MuestraGEI.unidad_muestreo. "unidad_muestreo" es una vista
+# aparte para cargas que todavía no tienen MuestraGEI/SubmuestraGEI
 # importadas (solo unidad de muestreo/experimental).
 #
-# SubmuestraCO2 ya no tiene un campo `unidad_medida` propio (todas sus tomas
+# SubmuestraGEI ya no tiene un campo `unidad_medida` propio (todas sus tomas
 # comparten la unidad reportada por la fuente para la muestra completa): el
-# campo vive en MuestraCO2.unidad_medida (ver app/models/co2.py). TipoMuestra
+# campo vive en MuestraGEI.unidad_medida (ver app/models/co2.py). TipoMuestra
 # (equipo → gas → unidad habitual) es solo catálogo de referencia, no la
-# fuente de este dato. `fecha` sí es propia de cada SubmuestraCO2 (cada toma
+# fuente de este dato. `fecha` sí es propia de cada SubmuestraGEI (cada toma
 # puede caer en un día distinto, p. ej. cobija nocturna cruzando medianoche).
 _VISTAS_DESNORMALIZADAS = {
-    "submuestra_co2": {
-        "modelo_base": "SubmuestraCO2",
+    "submuestra_gei": {
+        "modelo_base": "SubmuestraGEI",
         "orden": ["fecha", "muestra_id", "n_toma"],
         "cadena": [
-            ("SubmuestraCO2", []),
-            ("MuestraCO2", ["muestra"]),
+            ("SubmuestraGEI", []),
+            ("MuestraGEI", ["muestra"]),
             ("UnidadMedida", ["muestra", "unidad_medida"]),
             ("Equipo", ["muestra", "analizador"]),
             ("UnidadMuestreo", ["muestra", "unidad_muestreo"]),
@@ -1675,7 +1774,7 @@ def _preparar_vista_carga(carga, nombre_vista, filtros_raw):
     return _preparar_vista_pks(pks, nombre_vista, filtros_raw)
 
 
-def _preparar_vista_proyecto(proyecto_id, nombre_vista, filtros_raw):
+def _preparar_vista_proyecto(proyecto_id, nombre_vista, filtros_raw, sitio_id=None):
     """Igual que `_preparar_vista_carga`, pero agrega los pks importados de
     TODAS las cargas ya importadas de las fuentes del proyecto, para poder
     ver en una sola tabla los datos de varios archivos/fuentes distintos."""
@@ -1688,10 +1787,10 @@ def _preparar_vista_proyecto(proyecto_id, nombre_vista, filtros_raw):
     for carga in cargas:
         pks.update((carga.pks_importados or {}).get(vista["modelo_base"], []))
 
-    return _preparar_vista_pks(sorted(pks), nombre_vista, filtros_raw)
+    return _preparar_vista_pks(sorted(pks), nombre_vista, filtros_raw, sitio_id=sitio_id)
 
 
-def _preparar_vista_pks(pks, nombre_vista, filtros_raw):
+def _preparar_vista_pks(pks, nombre_vista, filtros_raw, sitio_id=None):
     """Resuelve vista + queryset filtrado/ordenado a partir de una lista de
     pks del modelo base ya calculada (por una carga o por un proyecto)."""
     vista = _VISTAS_DESNORMALIZADAS.get(nombre_vista)
@@ -1713,12 +1812,21 @@ def _preparar_vista_pks(pks, nombre_vista, filtros_raw):
     # Mapa clave ("Modelo.campo") -> ruta ORM, para poder traducir los filtros
     # del usuario a filter(**{"ruta__campo__icontains": ...}).
     ruta_orm_por_clave = {}
+    ruta_sitio = None
     for modelo_nombre, ruta in cadena:
         for f in _campos_planos(apps.get_model("app", modelo_nombre)):
             ruta_orm_por_clave[f"{modelo_nombre}.{f.name}"] = ruta + [f.name]
+        if modelo_nombre == "Sitio":
+            ruta_sitio = ruta
 
     ModeloBase = apps.get_model("app", modelo_base)
     qs = ModeloBase.objects.filter(pk__in=pks).select_related(*_select_related_de_cadena(cadena))
+
+    # Filtro exacto por sitio (usado por el geoportal al elegir un marcador
+    # en el mapa): a diferencia de los filtros de texto de abajo, este es un
+    # match exacto de pk, no icontains.
+    if sitio_id and ruta_sitio is not None:
+        qs = qs.filter(**{f"{'__'.join(ruta_sitio + ['pk'])}": sitio_id})
 
     try:
         filtros = json.loads(filtros_raw or "{}")
@@ -1779,7 +1887,7 @@ def datos_carga(request, fuente_id, carga_id):
     except CargaArchivo.DoesNotExist:
         return JsonResponse({"error": "Carga no encontrada"}, status=404)
 
-    nombre_vista = request.GET.get("vista", "submuestra_co2")
+    nombre_vista = request.GET.get("vista", "submuestra_gei")
     vista, columnas, qs, error = _preparar_vista_carga(carga, nombre_vista, request.GET.get("filtros"))
     if error:
         return JsonResponse({"error": error}, status=400)
@@ -1794,8 +1902,11 @@ def datos_proyecto(request, proyecto_id):
     if not Proyecto.objects.filter(pk=proyecto_id).exists():
         return JsonResponse({"error": "Proyecto no encontrado"}, status=404)
 
-    nombre_vista = request.GET.get("vista", "submuestra_co2")
-    vista, columnas, qs, error = _preparar_vista_proyecto(proyecto_id, nombre_vista, request.GET.get("filtros"))
+    nombre_vista = request.GET.get("vista", "submuestra_gei")
+    sitio_id = request.GET.get("sitio") or None
+    vista, columnas, qs, error = _preparar_vista_proyecto(
+        proyecto_id, nombre_vista, request.GET.get("filtros"), sitio_id=sitio_id,
+    )
     if error:
         return JsonResponse({"error": error}, status=400)
 
@@ -1806,7 +1917,7 @@ def datos_proyecto(request, proyecto_id):
 
 
 _NOMBRES_HOJA_VISTA = {
-    "submuestra_co2": "Muestras CO2 (detalle)",
+    "submuestra_gei": "Muestras GEI (detalle)",
     "unidad_muestreo": "Unidad Muestreo-Experimental",
     "clima": "Clima",
 }

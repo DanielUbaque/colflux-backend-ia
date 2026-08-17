@@ -6,9 +6,9 @@ from app.api.dashboard.views import DashboardView, DataModelView, VisualizerView
 from app.api.datos.views import FuenteDatosViewSet, fuentes_datos_api
 from app.api.etl.views import (
     archivo_fuente, campos_destino, datos_carga, datos_proyecto, exportar_carga, importar_carga, mapeo_carga,
-    previsualizar_carga, upload_archivo, validar_carga,
+    previsualizar_carga, regex_sugerido, upload_archivo, validar_carga, verificar_existencia,
 )
-from app.api.geo.views import series_co2, sitios_geojson
+from app.api.geo.views import resumen_geografico, series_co2, sitios_geojson
 from app.api.institucion.views import InstitucionViewSet
 from app.api.proyecto.views import ProyectoViewSet
 from app.api.reglas.views import (
@@ -40,6 +40,8 @@ urlpatterns = [
     path("api/proyectos/crear/", ProyectoViewSet.as_view({"post": "create"}), name="proyectos-crear"),
     path("api/responsables/crear/", ReportadorViewSet.as_view({"post": "create"}), name="responsables-crear"),
     path("api/etl/campos-destino/", campos_destino, name="etl-campos-destino"),
+    path("api/etl/regex-sugerido/", regex_sugerido, name="etl-regex-sugerido"),
+    path("api/etl/verificar-existencia/", verificar_existencia, name="etl-verificar-existencia"),
     path("api/fuentes-datos/<int:fuente_id>/carga/<int:carga_id>/mapeo/", mapeo_carga, name="mapeo-carga"),
     path("api/fuentes-datos/<int:fuente_id>/carga/<int:carga_id>/validar/", validar_carga, name="validar-carga"),
     path("api/fuentes-datos/<int:fuente_id>/carga/<int:carga_id>/previsualizar/", previsualizar_carga, name="previsualizar-carga"),
@@ -55,5 +57,6 @@ urlpatterns = [
     path("api/reglas-autollenado/lotes/<uuid:lote_id>/deshacer/", deshacer_lote_autollenado, name="reglas-autollenado-deshacer"),
     path("api/geo/sitios/", sitios_geojson, name="geo-sitios"),
     path("api/geo/series/", series_co2, name="geo-series"),
+    path("api/geo/resumen/", resumen_geografico, name="geo-resumen"),
     path("", include(router.urls)),
 ]

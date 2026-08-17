@@ -485,7 +485,7 @@
         <div style="padding:12px 20px;border-top:1.5px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <button type="button" class="btn-secondary" id="btnSeccionAnterior">← Sección anterior</button>
           <button type="button" class="btn-primary" id="btnGuardarSeccion">✅ Validar y guardar esta sección</button>
-          <button type="button" class="btn-secondary" id="btnSinDatosSeccion" style="display:none;">🚫 No tengo datos de Sitio en este archivo</button>
+          <button type="button" class="btn-secondary" id="btnSinDatosSeccion" style="display:none;">🚫 No tengo datos de esta sección en este archivo</button>
           <button type="button" class="btn-secondary" id="btnSeccionSiguiente">Sección siguiente →</button>
           <div id="mapeoSeccionResultado" style="font-size:.8rem;flex-basis:100%;"></div>
         </div>
@@ -689,11 +689,16 @@
     document.getElementById('btnGuardarSeccion').style.display = esSinMapear ? 'none' : '';
     document.getElementById('mapeoSeccionResultado').style.display = esSinMapear ? 'none' : '';
 
-    // Botón "sin datos" — por ahora solo para Sitio: el archivo fuente no
-    // siempre trae columnas de sitio (se georreferencia aparte), así que se
-    // permite avanzar sin mapear/crear nada en esta sección.
-    const esSitio = !esSinMapear && actual && actual.nombre === 'Sitio';
-    document.getElementById('btnSinDatosSeccion').style.display = esSitio ? '' : 'none';
+    // Botón "sin datos" — solo para secciones que un archivo puede traer o
+    // no traer sin que eso sea un problema: Sitio (se georreferencia aparte)
+    // y Clima (no todo archivo de flujos trae variables ambientales). El
+    // resto de secciones (Unidad Experimental, Unidad de Muestreo, Muestras
+    // CO₂) son la razón de ser del archivo, así que no se ofrece saltarlas.
+    const SECCIONES_OPCIONALES = ['Sitio', 'Clima'];
+    const esOpcional = !esSinMapear && actual && SECCIONES_OPCIONALES.includes(actual.nombre);
+    const btnSinDatos = document.getElementById('btnSinDatosSeccion');
+    btnSinDatos.style.display = esOpcional ? '' : 'none';
+    if (esOpcional) btnSinDatos.textContent = `🚫 No tengo datos de ${actual.nombre} en este archivo`;
 
     guardarProgresoLocal();
   }
@@ -1038,6 +1043,43 @@
       }
     });
     return mejor;
+  }
+
+  // ── Reuso de configuración de cargas anteriores del mismo proyecto ──────
+  // Busca si otra carga de este proyecto ya usó un regex para llenar el
+  // mismo campo destino (p. ej. UnidadExperimental.nombre) y lo devuelve
+  // como punto de partida, para no tener que redescubrirlo a mano.
+  async function obtenerRegexSugerido(modelo, campo) {
+    if (!state.fuenteId || !modelo || !campo) return null;
+    try {
+      const url = `${API_BASE}/api/etl/regex-sugerido/?fuente=${encodeURIComponent(state.fuenteId)}` +
+        `&modelo=${encodeURIComponent(modelo)}&campo=${encodeURIComponent(campo)}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(window.COLFLUX_CONFIG.requestTimeoutMs) });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.regex_patron ? data : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Dice cuáles de los `valores` (ya resueltos por el regex) coinciden con un
+  // registro que ya existe en el proyecto de la fuente, para avisar en la
+  // vista previa si el mapeo va a reutilizar una unidad o crear una nueva.
+  async function verificarExistenciaValores(modelo, campo, valores) {
+    if (!state.fuenteId || !modelo || !campo || !valores.length) return { existentes: [], soportado: false };
+    try {
+      const res = await fetch(`${API_BASE}/api/etl/verificar-existencia/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fuente_id: state.fuenteId, modelo, campo, valores }),
+        signal: AbortSignal.timeout(window.COLFLUX_CONFIG.requestTimeoutMs),
+      });
+      if (!res.ok) return { existentes: [], soportado: false };
+      return await res.json();
+    } catch (e) {
+      return { existentes: [], soportado: false };
+    }
   }
 
   // Precarga el avance guardado en BD (mapeos copiados de la última carga de la fuente)
@@ -1785,6 +1827,7 @@
 
     const destDiv = document.createElement('div');
     destDiv.className = 'mapeo-col-destino';
+    destDiv.style.flexWrap = 'wrap';
 
     const selModelo = document.createElement('select');
     selModelo.dataset.idx = idx;
@@ -2033,9 +2076,12 @@
     regexInputPrincipal.style.cssText = 'min-width:200px;font-size:.78rem;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:monospace;';
     regexInputPrincipal.style.display = seleccion.aplicarRegex ? '' : 'none';
 
-    const previewPrincipal = crearVistaPreviaRegex(col);
+    const previewPrincipal = crearVistaPreviaRegex(col, () => ({ modelo: selModelo.value, campo: selCampo.value }));
     previewPrincipal.el.style.display = seleccion.aplicarRegex ? '' : 'none';
     if (seleccion.aplicarRegex) previewPrincipal.actualizar(regexInputPrincipal.value);
+
+    const sugerenciaRegexEl = document.createElement('div');
+    sugerenciaRegexEl.style.cssText = 'display:none;font-size:.72rem;color:var(--gray);width:100%;flex:1 1 100%;';
 
     regexInputPrincipal.addEventListener('input', () => {
       state.mapeoSeleccion[idx] = { ...state.mapeoSeleccion[idx], regexPatron: regexInputPrincipal.value };
@@ -2051,6 +2097,19 @@
       if (activar) {
         regexInputPrincipal.focus();
         previewPrincipal.actualizar(regexInputPrincipal.value);
+        if (!regexInputPrincipal.value) {
+          obtenerRegexSugerido(selModelo.value, selCampo.value).then(sugerencia => {
+            if (!sugerencia || regexInputPrincipal.value) return; // el usuario ya escribió algo
+            regexInputPrincipal.value = sugerencia.regex_patron;
+            state.mapeoSeleccion[idx] = { ...state.mapeoSeleccion[idx], regexPatron: sugerencia.regex_patron };
+            previewPrincipal.actualizar(sugerencia.regex_patron);
+            sugerenciaRegexEl.style.display = '';
+            sugerenciaRegexEl.textContent =
+              `💡 Sugerido a partir de "${sugerencia.columna_origen}" en la fuente "${sugerencia.fuente_nombre}" — puedes editarlo.`;
+          });
+        }
+      } else {
+        sugerenciaRegexEl.style.display = 'none';
       }
     });
 
@@ -2062,6 +2121,7 @@
     if (seleccion.modelo) {
       destDiv.appendChild(linkRegexPrincipal);
       destDiv.appendChild(regexInputPrincipal);
+      destDiv.appendChild(sugerenciaRegexEl);
       destDiv.appendChild(previewPrincipal.el);
     }
 
@@ -2252,9 +2312,12 @@
     regexInput.style.cssText = 'min-width:200px;font-size:.78rem;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:monospace;';
     regexInput.style.display = extra.aplicarRegex ? '' : 'none';
 
-    const previewExtra = crearVistaPreviaRegex(col);
+    const previewExtra = crearVistaPreviaRegex(col, () => ({ modelo: selModeloExtra.value, campo: selCampo.value }));
     previewExtra.el.style.display = extra.aplicarRegex ? '' : 'none';
     if (extra.aplicarRegex) previewExtra.actualizar(regexInput.value);
+
+    const sugerenciaRegexExtraEl = document.createElement('div');
+    sugerenciaRegexExtraEl.style.cssText = 'display:none;font-size:.72rem;color:var(--gray);width:100%;flex:1 1 100%;';
 
     regexInput.addEventListener('input', () => {
       state.extrasDestino[extraIdx] = { ...state.extrasDestino[extraIdx], regexPatron: regexInput.value };
@@ -2270,6 +2333,19 @@
       if (activar) {
         regexInput.focus();
         previewExtra.actualizar(regexInput.value);
+        if (!regexInput.value) {
+          obtenerRegexSugerido(selModeloExtra.value, selCampo.value).then(sugerencia => {
+            if (!sugerencia || regexInput.value) return; // el usuario ya escribió algo
+            regexInput.value = sugerencia.regex_patron;
+            state.extrasDestino[extraIdx] = { ...state.extrasDestino[extraIdx], regexPatron: sugerencia.regex_patron };
+            previewExtra.actualizar(sugerencia.regex_patron);
+            sugerenciaRegexExtraEl.style.display = '';
+            sugerenciaRegexExtraEl.textContent =
+              `💡 Sugerido a partir de "${sugerencia.columna_origen}" en la fuente "${sugerencia.fuente_nombre}" — puedes editarlo.`;
+          });
+        }
+      } else {
+        sugerenciaRegexExtraEl.style.display = 'none';
       }
     });
 
@@ -2291,6 +2367,7 @@
     destDiv.appendChild(linkRegex);
     destDiv.appendChild(regexInput);
     destDiv.appendChild(btnQuitar);
+    destDiv.appendChild(sugerenciaRegexExtraEl);
     destDiv.appendChild(previewExtra.el);
 
     row.appendChild(infoDiv);
@@ -2319,7 +2396,7 @@
 
   function crearAvisoAutoVinculo() {
     const aviso = document.createElement('div');
-    aviso.style.cssText = 'width:100%;font-size:.74rem;color:var(--blue);background:var(--blue-l);border:1px solid var(--blue);border-radius:6px;padding:6px 8px;margin-top:4px;';
+    aviso.style.cssText = 'width:100%;flex:1 1 100%;font-size:.74rem;color:var(--blue);background:var(--blue-l);border:1px solid var(--blue);border-radius:6px;padding:6px 8px;margin-top:4px;';
     aviso.textContent = '💡 Este campo se completa solo con la Unidad Experimental creada en la misma fila del archivo — normalmente no hace falta mapearlo a mano.';
     return aviso;
   }
@@ -2375,9 +2452,16 @@
   // Construye el panel de vista previa: 5 valores fijos (elegidos al azar una
   // sola vez al abrirlo) y una función `actualizar(patron)` para recalcular
   // el resultado de cada uno a medida que el usuario edita el regex.
-  function crearVistaPreviaRegex(col) {
+  //
+  // `obtenerDestino()` devuelve el {modelo, campo} destino actual (se lee en
+  // cada `actualizar()`, no una sola vez, porque el usuario puede cambiar el
+  // campo destino sin que este panel se vuelva a crear). Con eso se consulta
+  // `verificar-existencia` para avisar, por cada valor resuelto, si ya existe
+  // un registro con ese nombre en el proyecto (se reutilizaría) o si sería
+  // uno nuevo.
+  function crearVistaPreviaRegex(col, obtenerDestino) {
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'margin-top:8px;padding:10px 12px;background:var(--gray-l);border:1px solid var(--border);border-radius:8px;width:100%;';
+    wrap.style.cssText = 'margin-top:8px;padding:10px 12px;background:var(--gray-l);border:1px solid var(--border);border-radius:8px;width:100%;flex:1 1 100%;';
 
     const titulo = document.createElement('div');
     titulo.style.cssText = 'font-size:.72rem;font-weight:700;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;';
@@ -2393,6 +2477,7 @@
     wrap.appendChild(filasEl);
 
     const valores = muestraAleatoria(col, 5);
+    let existenciaSeq = 0;
 
     function actualizar(patron) {
       const aviso = patron ? advertenciaLookbehindPython(patron) : null;
@@ -2404,10 +2489,12 @@
         filasEl.innerHTML = '<div style="font-size:.76rem;color:var(--gray);">No hay valores de muestra disponibles para esta columna.</div>';
         return;
       }
+      const badgesPorResultado = new Map();
       valores.forEach(v => {
         const fila = document.createElement('div');
         fila.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:.78rem;font-family:monospace;flex-wrap:wrap;';
         let resultadoHtml;
+        let resultadoOk = null;
         if (!patron) {
           resultadoHtml = `<span style="color:var(--gray);">— escribe un patrón —</span>`;
         } else {
@@ -2418,10 +2505,34 @@
             resultadoHtml = `<span style="color:var(--red);">sin match → se guardaría vacío</span>`;
           } else {
             resultadoHtml = `<span style="color:var(--green);font-weight:600;">"${escapeHtml(r.resultado)}"</span>`;
+            resultadoOk = r.resultado;
           }
         }
         fila.innerHTML = `<span style="color:var(--gray);">"${escapeHtml(v)}"</span><span>→</span>${resultadoHtml}`;
+        if (resultadoOk !== null) {
+          const badge = document.createElement('span');
+          badge.style.cssText = 'font-family:sans-serif;font-size:.72rem;';
+          fila.appendChild(badge);
+          if (!badgesPorResultado.has(resultadoOk)) badgesPorResultado.set(resultadoOk, []);
+          badgesPorResultado.get(resultadoOk).push(badge);
+        }
         filasEl.appendChild(fila);
+      });
+
+      const destino = obtenerDestino ? (obtenerDestino() || {}) : {};
+      const resultadosOk = [...badgesPorResultado.keys()];
+      if (!resultadosOk.length || !destino.modelo || !destino.campo) return;
+
+      const seq = ++existenciaSeq;
+      verificarExistenciaValores(destino.modelo, destino.campo, resultadosOk).then(({ existentes, soportado }) => {
+        if (seq !== existenciaSeq || !soportado) return; // superado por una edición posterior
+        const existentesSet = new Set(existentes || []);
+        badgesPorResultado.forEach((badges, resultado) => {
+          const texto = existentesSet.has(resultado)
+            ? '<span style="color:var(--blue);">♻️ ya existe — se reutiliza</span>'
+            : '<span style="color:var(--orange, #b45309);">＋ se crearía nuevo</span>';
+          badges.forEach(b => { b.innerHTML = texto; });
+        });
       });
     }
 
@@ -2587,8 +2698,12 @@
 
       const wrap = document.createElement('div');
       wrap.className = 'preview-entidad';
-      const creados = registros.filter(r => r.accion === 'creado').length;
-      const reutilizados = registros.length - creados;
+      // Conteo real del backend (sobre todas las filas), no derivado de
+      // `registros` — esa lista está recortada a _PREVIEW_MAX_POR_MODELO
+      // (200) filas para la tabla de muestra, así que contar ahí adentro
+      // subestima "nuevos"/"reutilizados" en archivos con más filas que eso.
+      const creados = info.creados ?? registros.filter(r => r.accion === 'creado').length;
+      const reutilizados = info.reutilizados ?? (registros.length - creados);
       wrap.innerHTML = `
         <div class="preview-entidad-titulo">
           ${escapeHtml(nombreEntidad(modelo))}

@@ -41,11 +41,11 @@ GRUPOS_CATALOGO = [
         "entidades": ["TorreEc", "ConfiguracionSensorGas"],
     },
     {
-        "nombre": "Muestras CO₂",
+        "nombre": "Muestras GEI",
         "icono": "🫧",
         "entidades": [
             "UnidadMedida", "Equipo", "TipoMuestra",
-            "MuestraAmbiental", "MuestraCO2", "SubmuestraCO2",
+            "MuestraAmbiental", "MuestraGEI", "SubmuestraGEI",
         ],
     },
     {
@@ -113,7 +113,7 @@ _FILTRO_PROYECTO_POR_MODELO = {
     "UnidadExperimental": "proyecto",
     "UnidadMuestreo": "unidad_experimental__proyecto",
     "MuestraAmbiental": "unidad_muestreo__unidad_experimental__proyecto",
-    "MuestraCO2": "unidad_muestreo__unidad_experimental__proyecto",
+    "MuestraGEI": "unidad_muestreo__unidad_experimental__proyecto",
 }
 
 

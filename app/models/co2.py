@@ -104,7 +104,7 @@ class MuestraAmbiental(TimestampedModel):
     microtopo = models.CharField("microtopología (microtopography)", max_length=10, choices=MICROTOPO_CHOICES, blank=True)
     # Obligatorio: sin unidad de muestreo no se sabe a qué lugar corresponde
     # la lectura. Permite cargar clima de forma independiente de una
-    # MuestraCO2 (p. ej. un archivo de estación meteorológica), pero siempre
+    # MuestraGEI (p. ej. un archivo de estación meteorológica), pero siempre
     # ubicado en el espacio.
     unidad_muestreo = models.ForeignKey(
         UnidadMuestreo, on_delete=models.PROTECT, related_name="muestras_ambientales",
@@ -134,16 +134,17 @@ class MuestraAmbiental(TimestampedModel):
         return f"Muestra ambiental {self.pk}"
 
 
-class MuestraCO2(TimestampedModel):
-    """Evento de medición de flujo de CO₂: un equipo analizador conectado a un tubo."""
+class MuestraGEI(TimestampedModel):
+    """Evento de medición de flujo de gas de efecto invernadero (CO₂, CH₄ o N₂O): un equipo analizador conectado a un tubo."""
 
     tubo = models.CharField("tubo", max_length=80, blank=True)
+    gas = models.CharField("gas", max_length=4, choices=TipoMuestra.GAS_CHOICES, blank=True)
     analizador = models.ForeignKey(
-        Equipo, on_delete=models.PROTECT, related_name="muestras_co2",
+        Equipo, on_delete=models.PROTECT, related_name="muestras_gei",
         null=True, blank=True, verbose_name="analizador",
     )
     unidad_muestreo = models.ForeignKey(
-        UnidadMuestreo, on_delete=models.PROTECT, related_name="muestras_co2",
+        UnidadMuestreo, on_delete=models.PROTECT, related_name="muestras_gei",
         null=True, blank=True, verbose_name="unidad de muestreo",
     )
     # Unidad reportada por la fuente para esta muestra (todas sus submuestras
@@ -151,21 +152,21 @@ class MuestraCO2(TimestampedModel):
     # TipoMuestra solo indica la unidad *habitual* de un equipo/gas, pero la
     # fuente puede reportar en otra — por eso se guarda explícita aquí.
     unidad_medida = models.ForeignKey(
-        UnidadMedida, on_delete=models.PROTECT, related_name="muestras_co2",
+        UnidadMedida, on_delete=models.PROTECT, related_name="muestras_gei",
         null=True, blank=True, verbose_name="unidad de medida",
     )
 
     class Meta:
-        verbose_name = "muestra CO₂"
-        verbose_name_plural = "muestras CO₂"
+        verbose_name = "muestra GEI"
+        verbose_name_plural = "muestras GEI"
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["analizador"])]
 
     def __str__(self):
-        return f"Muestra CO₂ {self.pk} — {self.tubo}"
+        return f"Muestra GEI {self.pk} — {self.tubo}"
 
 
-class SubmuestraCO2(TimestampedModel):
+class SubmuestraGEI(TimestampedModel):
     """Cada una de las tomas (~4, variable) de una muestra. Aquí vive el valor del flujo."""
 
     MOMENTO_CHOICES = [
@@ -179,8 +180,8 @@ class SubmuestraCO2(TimestampedModel):
     ]
 
     muestra = models.ForeignKey(
-        MuestraCO2, on_delete=models.CASCADE, related_name="submuestras",
-        verbose_name="muestra CO₂",
+        MuestraGEI, on_delete=models.CASCADE, related_name="submuestras",
+        verbose_name="muestra GEI",
     )
     n_toma = models.PositiveSmallIntegerField("número de toma", null=True, blank=True)
     fecha = models.DateField("fecha de la toma", null=True, blank=True)
@@ -190,8 +191,8 @@ class SubmuestraCO2(TimestampedModel):
     valor = models.DecimalField("valor del flujo", max_digits=14, decimal_places=6, null=True, blank=True)
 
     class Meta:
-        verbose_name = "submuestra CO₂"
-        verbose_name_plural = "submuestras CO₂"
+        verbose_name = "submuestra GEI"
+        verbose_name_plural = "submuestras GEI"
         ordering = ["muestra", "n_toma"]
 
     def __str__(self):
@@ -200,5 +201,5 @@ class SubmuestraCO2(TimestampedModel):
     @property
     def unidad_medida(self):
         """No se guarda por toma: todas las tomas de una muestra comparten la
-        misma unidad, reportada por la fuente en MuestraCO2.unidad_medida."""
+        misma unidad, reportada por la fuente en MuestraGEI.unidad_medida."""
         return self.muestra.unidad_medida
