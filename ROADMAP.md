@@ -17,6 +17,7 @@ Estado del trabajo y próximos pasos. Se actualiza al final de cada sesión rele
 1. **Backfill de `Sitio.municipio`.** Los 76 sitios existentes tienen `municipio_id = null`. Sin esto, `/api/geo/resumen/?nivel=departamento|municipio|region` no puede agrupar nada (devuelve `features: []`). El usuario dijo que lo va a cargar — falta el comando/proceso concreto y verificar después.
 2. Verificar `/api/geo/resumen/` en los tres niveles restantes una vez resuelto (1) — geometría de departamentos y municipios ya está cargada.
 3. **Cargar geometría de nivel vereda y manzana.** No hay todavía modelo/campo ni comando (`load_municipios_geom` solo cubre hasta municipio) — falta definir cómo se relaciona con `Municipio`/`Sitio` y conseguir el `.gpkg` correspondiente del DANE (MGN vereda / manzana censal).
+4. **Revisar el modelo de datos, sección de relaciones entre entidades, para ver bien cuáles tablas son "tipos" (catálogos) vs. entidades propias.** Recordatorio: revisar en particular las entidades de **Parcela** y **Unidad Experimental**.
 
 ## Pendiente — diseño acordado, falta implementar
 
