@@ -1,5 +1,4 @@
-import json
-
+from django.contrib.gis.geos import GEOSGeometry, MultiPolygon
 from django.core.management.base import BaseCommand, CommandError
 
 from app.models.geo import Departamento
@@ -42,7 +41,10 @@ class Command(BaseCommand):
             if depto is None:
                 sin_match.append((codigo, row.get("DPTO_CNMBR")))
                 continue
-            depto.geom = json.loads(gpd.GeoSeries([row.geometry]).to_json())["features"][0]["geometry"]
+            geom = GEOSGeometry(row.geometry.wkt, srid=4326)
+            if geom.geom_type == "Polygon":
+                geom = MultiPolygon(geom)
+            depto.geom = geom
             actualizados.append(depto)
 
         Departamento.objects.bulk_update(actualizados, ["geom"])

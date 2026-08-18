@@ -18,7 +18,7 @@ class SitioForm(forms.ModelForm):
             "uso_actual",
             "propiedad_tierra",
             "intervenido",
-            "municipio",
+            "vereda",
             "disturbio",
             "vegetacion",
             "cobertura",

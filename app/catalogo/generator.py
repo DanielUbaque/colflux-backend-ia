@@ -90,7 +90,7 @@ def semilla_rows(modelo_cls):
     concrete_fields = [
         field
         for field in modelo_cls._meta.get_fields()
-        if hasattr(field, "column") and field.name not in ("created_at", "updated_at")
+        if hasattr(field, "column") and field.name not in ("created_at", "updated_at", "geom")
     ]
     fk_names = [f.name for f in concrete_fields if f.is_relation]
 

@@ -15,6 +15,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.gis",
     "app",
     "corsheaders",
     "rest_framework",
@@ -64,7 +65,7 @@ from urllib.parse import urlparse
 db = urlparse(DATABASE_URL)
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": db.path.lstrip("/"),
         "USER": db.username,
         "PASSWORD": db.password,

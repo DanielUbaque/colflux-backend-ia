@@ -1,3 +1,4 @@
+from django.contrib.gis.db import models as gis_models
 from django.db import models
 
 from .base import TimestampedModel
@@ -56,7 +57,7 @@ class Departamento(TimestampedModel):
         "código DANE", max_length=2, unique=True, null=True, blank=True
     )
     region = models.ForeignKey(Region, on_delete=models.PROTECT, related_name="departamentos")
-    geom = models.JSONField("geometría (GeoJSON)", null=True, blank=True)
+    geom = gis_models.MultiPolygonField("geometría", srid=4326, null=True, blank=True)
 
     class Meta:
         verbose_name = "departamento"
@@ -75,7 +76,7 @@ class Municipio(TimestampedModel):
         "código DANE", max_length=5, unique=True, null=True, blank=True
     )
     departamento = models.ForeignKey(Departamento, on_delete=models.PROTECT, related_name="municipios")
-    geom = models.JSONField("geometría (GeoJSON)", null=True, blank=True)
+    geom = gis_models.MultiPolygonField("geometría", srid=4326, null=True, blank=True)
 
     class Meta:
         verbose_name = "municipio"
@@ -85,6 +86,31 @@ class Municipio(TimestampedModel):
 
     def __str__(self):
         return f"{self.nombre}, {self.departamento}"
+
+
+class Vereda(TimestampedModel):
+    """Subdivisión rural (vereda) o urbana (manzana censal) de un municipio, según el MGN del DANE."""
+
+    VEREDA = "vereda"
+    MANZANA = "manzana"
+    TIPO_CHOICES = [
+        (VEREDA, "Vereda"),
+        (MANZANA, "Manzana censal"),
+    ]
+
+    nombre = models.CharField(max_length=160, blank=True)
+    codigo_dane = models.CharField("código DANE", max_length=25, unique=True)
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES)
+    municipio = models.ForeignKey(Municipio, on_delete=models.PROTECT, related_name="veredas")
+    geom = gis_models.MultiPolygonField("geometría", srid=4326, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "vereda"
+        verbose_name_plural = "veredas"
+        ordering = ["municipio__nombre", "nombre"]
+
+    def __str__(self):
+        return f"{self.nombre or self.codigo_dane} ({self.get_tipo_display()}), {self.municipio}"
 
 
 class SistemaReferencia(TimestampedModel):

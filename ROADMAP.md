@@ -6,18 +6,21 @@ Estado del trabajo y próximos pasos. Se actualiza al final de cada sesión rele
 
 - **SQLite local eliminado** y bloqueado en código (`colflux/settings.py` exige `DATABASE_URL`, sin fallback).
 - **Geometría de departamentos cargada** (33/33, incluye Bogotá D.C. agregada como nuevo registro). Comando: `python manage.py load_departamentos_geom data/departamentos.gpkg`.
-- **Geometría de municipios cargada** (1121/1121). Campo `Municipio.geom` (JSONField, migración `0068_municipio_geom`) y comando `load_municipios_geom` (mismo patrón que departamentos, cruza por `MPIO_CDPMP`). Faltaban 2 municipios en la BD (San José de Uré 23682 y Tuchín 23815, Córdoba) — se agregaron con la migración de datos `0069_seed_municipios_faltantes`.
+- **Geometría de municipios cargada** (1121/1122, falta Mapiripaná sin match en el `.gpkg` del DANE). Comando `load_municipios_geom` (mismo patrón que departamentos, cruza por `MPIO_CDPMP`). Faltaban 2 municipios en la BD (San José de Uré 23682 y Tuchín 23815, Córdoba) — se agregaron con la migración de datos `0069_seed_municipios_faltantes`.
 - **API geográfica ampliada:**
   - `/api/geo/series/`: filtros nuevos `municipio`, `region`, `desde`, `hasta` (antes solo `anio`).
   - `/api/geo/resumen/` (nuevo): agregado por `nivel=departamento|municipio|region|sitio`, mismos filtros que `series`.
 - **`CLAUDE.md` y este `ROADMAP.md` creados.**
+- **Migración a GeoDjango/PostGIS.** `Departamento.geom`/`Municipio.geom` pasaron de `JSONField` a `MultiPolygonField` (SRID 4326); DB corre en `postgis/postgis:16-3.4-alpine` (migraciones `0070_enable_postgis`, `0071_departamento_municipio_geom_postgis`). Se agregó `Sitio.geom` (`PointField`, SRID 4326, migración `0072_sitio_geom`), derivado automáticamente de `latitud`/`longitud` en `Sitio.save()` — `latitud`/`longitud` siguen siendo la fuente de verdad editable.
+- **Backfill de `Sitio.municipio` resuelto.** Comando `backfill_sitio_municipio` (point-in-polygon: `Municipio.objects.filter(geom__contains=sitio.geom)`) — los 76 sitios existentes ya tienen `municipio` asignado. `/api/geo/resumen/` agrega correctamente en los 4 niveles (verificado; el dataset de seed actual está concentrado en Cundinamarca).
+- **Nuevo modelo `Vereda`** (`app/models/geo.py`, migración `0073_vereda`): cubre vereda (rural) y manzana censal (urbana) del MGN en un solo modelo con campo `tipo`, FK a `Municipio`, `geom` (`MultiPolygonField`). Comando `load_veredas_geom <gpkg> --tipo vereda|manzana`. Veredas cargadas: 33.355/33.428 (73 filas venían como polígonos multi-parte con el mismo `codigo_dane` — se unieron con `GEOSGeometry.union()` en vez de `shapely.unary_union`, que rompe bajo emulación arm64/qemu, ver `CLAUDE.md`). Manzanas censales: 517.105/517.105 cargadas sin filas sin match. Total `Vereda`: 550.460 registros.
 
 ## Pendiente — corto plazo
 
-1. **Backfill de `Sitio.municipio`.** Los 76 sitios existentes tienen `municipio_id = null`. Sin esto, `/api/geo/resumen/?nivel=departamento|municipio|region` no puede agrupar nada (devuelve `features: []`). El usuario dijo que lo va a cargar — falta el comando/proceso concreto y verificar después.
-2. Verificar `/api/geo/resumen/` en los tres niveles restantes una vez resuelto (1) — geometría de departamentos y municipios ya está cargada.
-3. **Cargar geometría de nivel vereda y manzana.** No hay todavía modelo/campo ni comando (`load_municipios_geom` solo cubre hasta municipio) — falta definir cómo se relaciona con `Municipio`/`Sitio` y conseguir el `.gpkg` correspondiente del DANE (MGN vereda / manzana censal).
-4. **Revisar el modelo de datos, sección de relaciones entre entidades, para ver bien cuáles tablas son "tipos" (catálogos) vs. entidades propias.** Recordatorio: revisar en particular las entidades de **Parcela** y **Unidad Experimental**.
+1. **Revisar el modelo de datos, sección de relaciones entre entidades, para ver bien cuáles tablas son "tipos" (catálogos) vs. entidades propias.** Recordatorio: revisar en particular las entidades de **Parcela** y **Unidad Experimental**.
+2. **Cuando se haga la próxima carga de datos (ETL de sitios/muestras), revisar también la sección de sistemas de referencia espacial** (`SistemaReferencia` en `app/models/geo.py`: EPSG:4326/4686/4674) — confirmar que los sitios cargados declaran el sistema correcto y que coincide con el supuesto de `Sitio.save()` (asume que `latitud`/`longitud` ya vienen en WGS84/EPSG:4326 al construir `Point(...)`; si un sitio viene en otro sistema, `geom` quedaría mal ubicado sin reproyectar primero). Extender esta revisión a `Vereda`: `vereda.gpkg` ya viene en EPSG:4326 pero `manzana.gpkg` viene en EPSG:4674 (se reproyecta al cargar, confirmar que se mantenga así con datasets futuros del DANE).
+3. **`backfill_sitio_municipio` no corre automáticamente.** Falta engancharlo a la carga de datos (ETL) para que sitios nuevos con lat/lon pero sin `municipio` se resuelvan solos, en vez de requerir correr el comando a mano.
+4. **`Sitio` no tiene FK a `Vereda` todavía.** Si se necesita agregación a ese nivel, falta agregar el campo y un backfill espacial análogo a `backfill_sitio_municipio` (point-in-polygon contra `Vereda.geom`, filtrando por `tipo` según si el sitio cae en área rural o urbana).
 
 ## Pendiente — diseño acordado, falta implementar
 
@@ -33,7 +36,7 @@ Estado del trabajo y próximos pasos. Se actualiza al final de cada sesión rele
 ## Ideas mencionadas, no decididas
 
 - `Region.geom` (unión de sus departamentos) — se descartó por ahora a favor de que el front dibuje los departamentos miembros (ya viene la lista en `properties.departamentos` cuando `nivel=region`).
-- **Revisión de `app/api/geo/views.py`: el proyecto no usa GeoDjango.** `DATABASES.ENGINE` es `postgresql` normal (no `postgis`), `Departamento.geom`/`Municipio.geom` son `JSONField` (GeoJSON crudo) y `Sitio.latitud`/`longitud` son `DecimalField` sueltos — no hay tipos espaciales ni índices GiST en la BD. `geopandas`/`shapely` solo se usan offline en los comandos `load_*_geom`. Sin decidir todavía si migrar a GeoDjango (PostGIS + `PointField`/`MultiPolygonField`, habilita bbox/distancia/simplificación en la propia query) o quedarnos como está.
+- **Migración a GeoDjango: completa para `Departamento`/`Municipio`/`Sitio`** (ver "Hecho" arriba). `DATABASES.ENGINE` es `django.contrib.gis.db.backends.postgis`.
   - Hallazgos de rendimiento en las vistas actuales, independientes de esa decisión:
     - `sitios_geojson` y `resumen_geografico` traen **todas** las `SubmuestraCO2` filtradas a Python y agregan a mano (conteos, min/max, última medición) en vez de usar `.values(...).annotate(Count/Avg/Min/Max)` y `DISTINCT ON` de Postgres. La tabla materializada `ResumenGeoMensual` (arriba) resuelve esto de raíz cuando se implemente.
     - `series_co2` no tiene paginación ni límite — devuelve el dataset filtrado completo en un solo response.

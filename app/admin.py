@@ -56,10 +56,10 @@ class DisturbioAdmin(admin.ModelAdmin):
 
 @admin.register(Sitio)
 class SitioAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "municipio", "latitud", "longitud", "uso_actual", "intervenido")
+    list_display = ("nombre", "vereda", "latitud", "longitud", "uso_actual", "intervenido")
     list_filter = ("uso_actual", "propiedad_tierra", "pendiente")
     search_fields = ("nombre", "codigo_metadatos")
-    raw_id_fields = ("municipio", "disturbio", "vegetacion", "cobertura", "sistema_referencia")
+    raw_id_fields = ("vereda", "disturbio", "vegetacion", "cobertura", "sistema_referencia")
 
 
 @admin.register(UnidadMuestreoTipo)

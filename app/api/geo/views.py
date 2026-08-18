@@ -1,3 +1,5 @@
+import json
+
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
@@ -14,7 +16,7 @@ def sitios_geojson(request):
     un cliente Leaflet (L.geoJSON(url))."""
     sitios = (
         Sitio.objects
-        .select_related("municipio", "municipio__departamento")
+        .select_related("vereda", "vereda__municipio", "vereda__municipio__departamento")
         .prefetch_related(
             "unidades_muestreo__tipo",
             "unidades_muestreo__unidad_experimental__proyecto",
@@ -85,10 +87,15 @@ def sitios_geojson(request):
             "properties": {
                 "id": sitio.pk,
                 "nombre": sitio.nombre,
-                "municipio": sitio.municipio.nombre if sitio.municipio_id else None,
+                "vereda": sitio.vereda.nombre if sitio.vereda_id else None,
+                "municipio": (
+                    sitio.vereda.municipio.nombre
+                    if sitio.vereda_id and sitio.vereda.municipio_id else None
+                ),
                 "departamento": (
-                    sitio.municipio.departamento.nombre
-                    if sitio.municipio_id and sitio.municipio.departamento_id else None
+                    sitio.vereda.municipio.departamento.nombre
+                    if sitio.vereda_id and sitio.vereda.municipio_id and sitio.vereda.municipio.departamento_id
+                    else None
                 ),
                 "altitud": float(sitio.altitud) if sitio.altitud is not None else None,
                 "uso_actual": sitio.get_uso_actual_display() if sitio.uso_actual else None,
@@ -130,18 +137,18 @@ def sitios_geojson(request):
 def series_co2(request):
     """Lecturas crudas de flujo de gas (una fila por SubmuestraGEI con fecha),
     con filtros opcionales por año o rango de fechas, gas (CO2/CH4/N2O),
-    sitio, proyecto, municipio, departamento y región. Sin ?gas= devuelve los
-    tres gases mezclados -cada resultado trae su propio campo "gas" para que
-    el cliente filtre/agrupe-. No agrega ni convierte unidades -eso queda a
-    criterio de quien consuma la serie-, solo devuelve el dato tal como está
-    en la base para que el geoportal (u otro cliente) arme sus propios
-    gráficos de tendencia/agregados."""
+    sitio, proyecto, vereda, municipio, departamento y región. Sin ?gas=
+    devuelve los tres gases mezclados -cada resultado trae su propio campo
+    "gas" para que el cliente filtre/agrupe-. No agrega ni convierte unidades
+    -eso queda a criterio de quien consuma la serie-, solo devuelve el dato
+    tal como está en la base para que el geoportal (u otro cliente) arme sus
+    propios gráficos de tendencia/agregados."""
     qs = (
         SubmuestraGEI.objects
         .exclude(fecha=None)
         .select_related(
             "muestra__unidad_medida",
-            "muestra__unidad_muestreo__sitio__municipio__departamento__region",
+            "muestra__unidad_muestreo__sitio__vereda__municipio__departamento__region",
             "muestra__unidad_muestreo__unidad_experimental__proyecto",
         )
         .order_by("fecha")
@@ -171,23 +178,29 @@ def series_co2(request):
     if proyecto_id:
         qs = qs.filter(muestra__unidad_muestreo__unidad_experimental__proyecto_id=proyecto_id)
 
+    vereda_id = request.GET.get("vereda")
+    if vereda_id:
+        qs = qs.filter(muestra__unidad_muestreo__sitio__vereda_id=vereda_id)
+
     municipio_id = request.GET.get("municipio")
     if municipio_id:
-        qs = qs.filter(muestra__unidad_muestreo__sitio__municipio_id=municipio_id)
+        qs = qs.filter(muestra__unidad_muestreo__sitio__vereda__municipio_id=municipio_id)
 
     departamento_id = request.GET.get("departamento")
     if departamento_id:
-        qs = qs.filter(muestra__unidad_muestreo__sitio__municipio__departamento_id=departamento_id)
+        qs = qs.filter(muestra__unidad_muestreo__sitio__vereda__municipio__departamento_id=departamento_id)
 
     region_id = request.GET.get("region")
     if region_id:
-        qs = qs.filter(muestra__unidad_muestreo__sitio__municipio__departamento__region_id=region_id)
+        qs = qs.filter(muestra__unidad_muestreo__sitio__vereda__municipio__departamento__region_id=region_id)
 
     resultados = []
     for sub in qs:
         um = sub.muestra.unidad_muestreo
         sitio = um.sitio if um else None
         ue = um.unidad_experimental if um else None
+        vereda = sitio.vereda if sitio and sitio.vereda_id else None
+        municipio = vereda.municipio if vereda and vereda.municipio_id else None
         resultados.append({
             "fecha": sub.fecha.isoformat(),
             "valor": float(sub.valor) if sub.valor is not None else None,
@@ -195,10 +208,12 @@ def series_co2(request):
             "gas": sub.muestra.gas or None,
             "sitio_id": sitio.pk if sitio else None,
             "sitio_nombre": sitio.nombre if sitio else None,
-            "departamento_id": sitio.municipio.departamento_id if sitio and sitio.municipio_id else None,
+            "vereda_id": vereda.pk if vereda else None,
+            "vereda": vereda.nombre if vereda else None,
+            "departamento_id": municipio.departamento_id if municipio and municipio.departamento_id else None,
             "departamento": (
-                sitio.municipio.departamento.nombre
-                if sitio and sitio.municipio_id and sitio.municipio.departamento_id else None
+                municipio.departamento.nombre
+                if municipio and municipio.departamento_id else None
             ),
             "proyecto_id": ue.proyecto_id if ue else None,
             "proyecto_nombre": ue.proyecto.nombre if ue and ue.proyecto_id else None,
@@ -211,20 +226,19 @@ def series_co2(request):
 def resumen_geografico(request):
     """Resumen agregado (conteo, promedio, mínimo, máximo, última medición)
     de SubmuestraGEI, agrupado por un nivel geográfico: ?nivel=departamento
-    (default), municipio, region o sitio. Acepta los mismos filtros que
-    /api/geo/series/ (gas, desde, hasta, proyecto, departamento, municipio,
-    región) para acotar antes de agregar. Pensado para mapas tipo choropleth
-    y tarjetas de resumen del geoportal.
+    (default), municipio, vereda, region o sitio. Acepta los mismos filtros
+    que /api/geo/series/ (gas, desde, hasta, proyecto, departamento,
+    municipio, vereda, región) para acotar antes de agregar. Pensado para
+    mapas tipo choropleth y tarjetas de resumen del geoportal.
 
-    "region" no tiene geometría propia en el modelo (solo departamento y
-    sitio la tienen): sus features salen con geometry=null y una lista
-    "departamentos" con los departamentos que la componen, para que el
-    cliente los dibuje/resalte. Igual pasa con "municipio" mientras no se
-    cargue su geometría (geometry=null hasta entonces)."""
+    "region" no tiene geometría propia en el modelo (solo departamento,
+    municipio, vereda y sitio la tienen): sus features salen con
+    geometry=null y una lista "departamentos" con los departamentos que la
+    componen, para que el cliente los dibuje/resalte."""
     nivel = request.GET.get("nivel", "departamento")
-    if nivel not in ("departamento", "municipio", "region", "sitio"):
+    if nivel not in ("departamento", "municipio", "vereda", "region", "sitio"):
         return JsonResponse(
-            {"error": "nivel debe ser uno de: departamento, municipio, region, sitio"}, status=400,
+            {"error": "nivel debe ser uno de: departamento, municipio, vereda, region, sitio"}, status=400,
         )
 
     qs = (
@@ -232,7 +246,7 @@ def resumen_geografico(request):
         .exclude(fecha=None)
         .select_related(
             "muestra__unidad_medida",
-            "muestra__unidad_muestreo__sitio__municipio__departamento__region",
+            "muestra__unidad_muestreo__sitio__vereda__municipio__departamento__region",
             "muestra__unidad_muestreo__unidad_experimental__proyecto",
         )
     )
@@ -253,17 +267,21 @@ def resumen_geografico(request):
     if proyecto_id:
         qs = qs.filter(muestra__unidad_muestreo__unidad_experimental__proyecto_id=proyecto_id)
 
+    vereda_id = request.GET.get("vereda")
+    if vereda_id:
+        qs = qs.filter(muestra__unidad_muestreo__sitio__vereda_id=vereda_id)
+
     municipio_id = request.GET.get("municipio")
     if municipio_id:
-        qs = qs.filter(muestra__unidad_muestreo__sitio__municipio_id=municipio_id)
+        qs = qs.filter(muestra__unidad_muestreo__sitio__vereda__municipio_id=municipio_id)
 
     departamento_id = request.GET.get("departamento")
     if departamento_id:
-        qs = qs.filter(muestra__unidad_muestreo__sitio__municipio__departamento_id=departamento_id)
+        qs = qs.filter(muestra__unidad_muestreo__sitio__vereda__municipio__departamento_id=departamento_id)
 
     region_id = request.GET.get("region")
     if region_id:
-        qs = qs.filter(muestra__unidad_muestreo__sitio__municipio__departamento__region_id=region_id)
+        qs = qs.filter(muestra__unidad_muestreo__sitio__vereda__municipio__departamento__region_id=region_id)
 
     grupos = {}
     for sub in qs:
@@ -271,18 +289,29 @@ def resumen_geografico(request):
         sitio = um.sitio if um else None
         if sitio is None:
             continue
-        municipio = sitio.municipio if sitio.municipio_id else None
+        vereda = sitio.vereda if sitio.vereda_id else None
+        municipio = vereda.municipio if vereda and vereda.municipio_id else None
         departamento = municipio.departamento if municipio and municipio.departamento_id else None
 
-        if nivel != "sitio" and municipio is None:
-            # departamento/municipio/region no se pueden agregar sin saber a
-            # qué municipio pertenece el sitio.
+        if nivel != "sitio" and vereda is None:
+            # departamento/municipio/vereda/region no se pueden agregar sin
+            # saber a qué vereda pertenece el sitio.
             continue
 
         if nivel == "sitio":
             clave, nombre, geom = sitio.pk, sitio.nombre, {
                 "type": "Point", "coordinates": [float(sitio.longitud), float(sitio.latitud)],
             }
+            extra = {
+                "vereda_id": vereda.pk if vereda else None,
+                "vereda": vereda.nombre if vereda else None,
+                "municipio_id": municipio.pk if municipio else None,
+                "municipio": municipio.nombre if municipio else None,
+                "departamento_id": departamento.pk if departamento else None,
+                "departamento": departamento.nombre if departamento else None,
+            }
+        elif nivel == "vereda":
+            clave, nombre, geom = vereda.pk, vereda.nombre, vereda.geom
             extra = {
                 "municipio_id": municipio.pk if municipio else None,
                 "municipio": municipio.nombre if municipio else None,
@@ -352,6 +381,8 @@ def resumen_geografico(request):
                 {"id": pk, "nombre": nom} for pk, nom in sorted(g["departamentos"].items(), key=lambda x: x[1])
             ]
 
-        features.append({"type": "Feature", "geometry": g["geom"], "properties": properties})
+        geom = g["geom"]
+        geometry = json.loads(geom.geojson) if hasattr(geom, "geojson") else geom
+        features.append({"type": "Feature", "geometry": geometry, "properties": properties})
 
     return JsonResponse({"type": "FeatureCollection", "features": features})

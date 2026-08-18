@@ -1,6 +1,6 @@
 from .base import TimestampedModel
 
-from .geo import Departamento, Municipio, Region, SistemaReferencia
+from .geo import Departamento, Municipio, Region, SistemaReferencia, Vereda
 
 from .cobertura import Cobertura, Disturbio, Vegetacion
 
@@ -33,6 +33,7 @@ __all__ = [
     "Municipio",
     "Region",
     "SistemaReferencia",
+    "Vereda",
     # Cobertura / Disturbio / Vegetación
     "Cobertura",
     "Disturbio",
