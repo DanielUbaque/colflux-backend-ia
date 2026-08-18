@@ -239,15 +239,29 @@
   let proyectoActualId = proyectoId || null;
   const dropdownData = { proyectos: [], fuentes: [] };
 
-  const NOMBRES_VISTA = {
-    submuestra_gei: 'Muestras GEI (detalle)',
-    unidad_muestreo: 'Unidad de Muestreo / Experimental',
-    clima: 'Clima',
-  };
+  // Una única fila de pestañas: CO₂/CH₄ son la vista "submuestra_gei" con un
+  // filtro de gas fijo, no una vista aparte — así queda todo en una sola
+  // línea en vez de "vista" + "gas" como dos filas de tabs anidadas. La
+  // exportación (_HOJAS_EXPORT en el backend) usa la misma partición.
+  const TABS = [
+    { id: 'CO2', label: 'CO₂', vista: 'submuestra_gei', gas: 'CO2' },
+    { id: 'CH4', label: 'CH₄', vista: 'submuestra_gei', gas: 'CH4' },
+    { id: 'unidad_muestreo', label: 'Unidad de Muestreo / Experimental', vista: 'unidad_muestreo', gas: null },
+    { id: 'clima', label: 'Clima', vista: 'clima', gas: null },
+  ];
+
+  function tabActual() {
+    return TABS.find(t => t.id === state.tab) || TABS[0];
+  }
+
+  function filtroBaseTab() {
+    const tab = tabActual();
+    return tab.gas ? { 'MuestraGEI.gas': tab.gas } : {};
+  }
 
   const state = {
-    vista: 'submuestra_gei', offset: 0, limite: 200, total: 0, columnas: [], filas: [], filtros: {},
-    vistasDisponibles: [], reglas: {},
+    tab: 'CO2', offset: 0, limite: 200, total: 0, columnas: [], filas: [], filtros: { 'MuestraGEI.gas': 'CO2' },
+    reglas: {},
   };
 
   // Colores por modelo, para agrupar visualmente las columnas de la tabla
@@ -265,8 +279,6 @@
     const linkVolver = document.getElementById('linkVolver');
     linkVolver.href = 'data.html';
     linkVolver.textContent = '← Volver a Gestión de Datos';
-    // No hay endpoint de exportación agregada por proyecto (solo por carga).
-    document.getElementById('btnDescargarCsv').style.display = 'none';
   }
 
   function escapeHtml(str) {
@@ -277,17 +289,17 @@
 
   function renderTabs() {
     const tabsEl = document.getElementById('tabsVistas');
-    tabsEl.innerHTML = state.vistasDisponibles.map(v => `
-      <button type="button" class="tab-btn ${v === state.vista ? 'active' : ''}" data-vista="${v}">
-        ${escapeHtml(NOMBRES_VISTA[v] || v)}
+    tabsEl.innerHTML = TABS.map(t => `
+      <button type="button" class="tab-btn ${t.id === state.tab ? 'active' : ''}" data-tab="${t.id}">
+        ${escapeHtml(t.label)}
       </button>
     `).join('');
     tabsEl.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (btn.dataset.vista === state.vista) return;
-        state.vista = btn.dataset.vista;
+        if (btn.dataset.tab === state.tab) return;
+        state.tab = btn.dataset.tab;
         state.offset = 0;
-        state.filtros = {};
+        state.filtros = filtroBaseTab();
         cargarDatos();
       });
     });
@@ -309,7 +321,8 @@
 
   function renderTabla() {
     const contenido = document.getElementById('contenido');
-    document.getElementById('btnLimpiarFiltros').style.display = Object.keys(state.filtros).length ? 'inline-block' : 'none';
+    const hayFiltrosExtra = Object.keys(state.filtros).length > Object.keys(filtroBaseTab()).length;
+    document.getElementById('btnLimpiarFiltros').style.display = hayFiltrosExtra ? 'inline-block' : 'none';
 
     if (!state.columnas.length) {
       contenido.innerHTML = `<div class="warn-box">${escapeHtml(state.advertencia || 'No hay datos para mostrar todavía.')}</div>`;
@@ -434,7 +447,7 @@
     }
     try {
       const qs = new URLSearchParams({
-        offset: state.offset, limite: state.limite, vista: state.vista,
+        offset: state.offset, limite: state.limite, vista: tabActual().vista,
         filtros: JSON.stringify(state.filtros),
       });
       const url = proyectoId
@@ -450,13 +463,12 @@
       state.columnas = data.columnas || [];
       state.filas = data.filas || [];
       state.advertencia = data.advertencia;
-      state.vistasDisponibles = data.vistas || [state.vista];
 
       const origen = proyectoId
         ? (proyectoNombre || `Proyecto #${proyectoId}`)
         : (proyectoNombre ? `${proyectoNombre} · Carga #${cargaId}` : `Carga #${cargaId}`);
       document.getElementById('heroSubtitulo').textContent =
-        `${origen} — ${NOMBRES_VISTA[state.vista] || state.vista}.`;
+        `${origen} — ${tabActual().label}.`;
       document.getElementById('toolbarInfo').textContent =
         state.total ? `${state.total} registro${state.total === 1 ? '' : 's'} · ${state.columnas.length} columnas` : 'Sin registros';
 
@@ -469,14 +481,16 @@
   }
 
   document.getElementById('btnLimpiarFiltros').addEventListener('click', () => {
-    state.filtros = {};
+    state.filtros = filtroBaseTab();
     state.filtroEnFoco = null;
     state.offset = 0;
     cargarDatos();
   });
 
   document.getElementById('btnDescargarCsv').addEventListener('click', () => {
-    window.location.href = `${API_BASE}/api/fuentes-datos/${fuenteId}/carga/${cargaId}/exportar/`;
+    window.location.href = proyectoId
+      ? `${API_BASE}/api/proyectos/${proyectoId}/exportar/`
+      : `${API_BASE}/api/fuentes-datos/${fuenteId}/carga/${cargaId}/exportar/`;
   });
 
   async function cargarNombreProyecto() {

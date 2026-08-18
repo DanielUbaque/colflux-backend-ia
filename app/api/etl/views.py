@@ -1738,7 +1738,8 @@ def _campos_planos(modelo_cls):
     listos para aplanar como columnas de la tabla desnormalizada."""
     return [
         f for f in modelo_cls._meta.get_fields()
-        if hasattr(f, "column") and not f.is_relation and f.name not in ("id", "created_at", "updated_at")
+        if hasattr(f, "column") and not f.is_relation and f.editable
+        and f.name not in ("id", "created_at", "updated_at")
     ]
 
 
@@ -1916,39 +1917,108 @@ def datos_proyecto(request, proyecto_id):
     )
 
 
-_NOMBRES_HOJA_VISTA = {
-    "submuestra_gei": "Muestras GEI (detalle)",
-    "unidad_muestreo": "Unidad Muestreo-Experimental",
-    "clima": "Clima",
+# Hojas del Excel exportado: misma partición que las pestañas del front
+# (CO₂ / CH₄ / Unidad Muestreo-Experimental / Clima) en vez de una hoja
+# combinada por vista — ver docs/pages/etl-datos.html (TABS).
+_HOJAS_EXPORT = [
+    {"nombre_vista": "submuestra_gei", "gas": "CO2", "hoja": "CO2 (detalle)"},
+    {"nombre_vista": "submuestra_gei", "gas": "CH4", "hoja": "CH4 (detalle)"},
+    {"nombre_vista": "unidad_muestreo", "gas": None, "hoja": "Unidad Muestreo-Experimental"},
+    {"nombre_vista": "clima", "gas": None, "hoja": "Clima"},
+]
+
+_TIPOS_DATO_LEGIBLES = {
+    "CharField": "Texto", "TextField": "Texto largo",
+    "DecimalField": "Numérico (decimal)", "FloatField": "Numérico (decimal)",
+    "IntegerField": "Numérico (entero)", "PositiveIntegerField": "Numérico (entero)",
+    "PositiveSmallIntegerField": "Numérico (entero)", "SmallIntegerField": "Numérico (entero)",
+    "BooleanField": "Sí/No", "DateField": "Fecha", "DateTimeField": "Fecha y hora",
+    "TimeField": "Hora", "EmailField": "Texto (email)", "URLField": "Texto (URL)",
+    "JSONField": "JSON",
 }
+
+
+def _tipo_dato_legible(field):
+    return _TIPOS_DATO_LEGIBLES.get(field.get_internal_type(), field.get_internal_type())
+
+
+def _dataframe_diccionario_datos():
+    """Una fila por (entidad, atributo) de todos los modelos que aparecen en
+    alguna vista desnormalizada, para documentar lo que trae cada exportación."""
+    modelos_vistos = []
+    nombres_vistos = set()
+    for vista in _VISTAS_DESNORMALIZADAS.values():
+        for modelo_nombre, _ruta in vista["cadena"]:
+            if modelo_nombre not in nombres_vistos:
+                nombres_vistos.add(modelo_nombre)
+                modelos_vistos.append(modelo_nombre)
+
+    # Qué pestañas del Excel (_HOJAS_EXPORT) traen cada modelo, para que el
+    # diccionario diga en qué hoja(s) encontrar cada atributo. Un modelo
+    # puede aparecer en varias vistas (ej. Sitio está en las tres).
+    hojas_por_modelo = {modelo_nombre: [] for modelo_nombre in modelos_vistos}
+    for hoja_def in _HOJAS_EXPORT:
+        cadena_vista = _VISTAS_DESNORMALIZADAS[hoja_def["nombre_vista"]]["cadena"]
+        for modelo_nombre, _ruta in cadena_vista:
+            if hoja_def["hoja"] not in hojas_por_modelo[modelo_nombre]:
+                hojas_por_modelo[modelo_nombre].append(hoja_def["hoja"])
+
+    filas = []
+    for modelo_nombre in modelos_vistos:
+        modelo_cls = apps.get_model("app", modelo_nombre)
+        entidad = str(modelo_cls._meta.verbose_name).capitalize()
+        pestana = ", ".join(hojas_por_modelo[modelo_nombre])
+        for f in _campos_planos(modelo_cls):
+            valores_permitidos = ", ".join(str(label) for _valor, label in f.choices) if getattr(f, "choices", None) else ""
+            filas.append({
+                "Pestaña": pestana,
+                "Entidad": entidad,
+                "Atributo": str(f.verbose_name),
+                "Descripción": str(f.help_text) if f.help_text else "",
+                "Valores permitidos (si aplica)": valores_permitidos,
+                "Tipo de dato": _tipo_dato_legible(f),
+            })
+
+    df = pd.DataFrame(filas, columns=["Pestaña", "Entidad", "Atributo", "Descripción", "Valores permitidos (si aplica)", "Tipo de dato"])
+    return df.sort_values("Entidad", kind="stable")
+
+
+def _agregar_hoja_diccionario_datos(writer):
+    _dataframe_diccionario_datos().to_excel(writer, sheet_name="Diccionario de datos", index=False)
 
 
 def exportar_carga(request, fuente_id, carga_id):
     """Descarga en un único Excel todos los datos importados por esta carga:
-    una pestaña por cada vista desnormalizada que tenga registros."""
+    una pestaña por cada pestaña del front (_HOJAS_EXPORT)."""
     try:
         carga = CargaArchivo.objects.get(pk=carga_id, fuente_id=fuente_id)
     except CargaArchivo.DoesNotExist:
         return JsonResponse({"error": "Carga no encontrada"}, status=404)
 
-    buffer = io.BytesIO()
-    hojas_escritas = 0
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        for nombre_vista in _VISTAS_DESNORMALIZADAS:
-            vista, columnas, qs, error = _preparar_vista_carga(carga, nombre_vista, None)
-            if error or qs is None:
-                continue
-            cadena = vista["cadena"]
-            claves = [c["clave"] for c in columnas]
-            encabezados = [c["verbose_name"] or c["campo"] for c in columnas]
-            filas = [_fila_desde_objeto(obj, cadena) for obj in qs.iterator()]
-            df = pd.DataFrame([[fila[clave] for clave in claves] for fila in filas], columns=encabezados)
-            hoja = _NOMBRES_HOJA_VISTA.get(nombre_vista, nombre_vista)[:31]
-            df.to_excel(writer, sheet_name=hoja, index=False)
-            hojas_escritas += 1
+    hojas = []
+    for hoja_def in _HOJAS_EXPORT:
+        filtros_raw = json.dumps({"MuestraGEI.gas": hoja_def["gas"]}) if hoja_def["gas"] else None
+        vista, columnas, qs, error = _preparar_vista_carga(carga, hoja_def["nombre_vista"], filtros_raw)
+        if error or qs is None:
+            continue
+        cadena = vista["cadena"]
+        claves = [c["clave"] for c in columnas]
+        encabezados = [c["verbose_name"] or c["campo"] for c in columnas]
+        filas = [_fila_desde_objeto(obj, cadena) for obj in qs.iterator()]
+        df = pd.DataFrame([[fila[clave] for clave in claves] for fila in filas], columns=encabezados)
+        hojas.append((hoja_def["hoja"][:31], df))
 
-    if not hojas_escritas:
+    # openpyxl exige al menos una hoja visible: si no hay datos, ni siquiera
+    # se abre el ExcelWriter (si no, revienta con IndexError al cerrarlo sin
+    # haber escrito nada).
+    if not hojas:
         return JsonResponse({"error": "Esta carga todavía no tiene datos importados."}, status=404)
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        for nombre_hoja, df in hojas:
+            df.to_excel(writer, sheet_name=nombre_hoja, index=False)
+        _agregar_hoja_diccionario_datos(writer)
 
     buffer.seek(0)
     response = HttpResponse(
@@ -1956,4 +2026,42 @@ def exportar_carga(request, fuente_id, carga_id):
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = f'attachment; filename="carga_{carga_id}.xlsx"'
+    return response
+
+
+def exportar_proyecto(request, proyecto_id):
+    """Descarga en un único Excel todos los datos importados del proyecto
+    (todas sus cargas ya importadas combinadas): una pestaña por cada
+    pestaña del front (_HOJAS_EXPORT)."""
+    if not Proyecto.objects.filter(pk=proyecto_id).exists():
+        return JsonResponse({"error": "Proyecto no encontrado"}, status=404)
+
+    hojas = []
+    for hoja_def in _HOJAS_EXPORT:
+        filtros_raw = json.dumps({"MuestraGEI.gas": hoja_def["gas"]}) if hoja_def["gas"] else None
+        vista, columnas, qs, error = _preparar_vista_proyecto(proyecto_id, hoja_def["nombre_vista"], filtros_raw)
+        if error or qs is None:
+            continue
+        cadena = vista["cadena"]
+        claves = [c["clave"] for c in columnas]
+        encabezados = [c["verbose_name"] or c["campo"] for c in columnas]
+        filas = [_fila_desde_objeto(obj, cadena) for obj in qs.iterator()]
+        df = pd.DataFrame([[fila[clave] for clave in claves] for fila in filas], columns=encabezados)
+        hojas.append((hoja_def["hoja"][:31], df))
+
+    if not hojas:
+        return JsonResponse({"error": "Este proyecto todavía no tiene datos importados."}, status=404)
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        for nombre_hoja, df in hojas:
+            df.to_excel(writer, sheet_name=nombre_hoja, index=False)
+        _agregar_hoja_diccionario_datos(writer)
+
+    buffer.seek(0)
+    response = HttpResponse(
+        buffer.read(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="proyecto_{proyecto_id}.xlsx"'
     return response

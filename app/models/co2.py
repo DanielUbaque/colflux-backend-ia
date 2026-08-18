@@ -8,8 +8,14 @@ from .sitio import UnidadMuestreo
 class UnidadMedida(TimestampedModel):
     """Catálogo de unidades de medida (configurable, p. ej. co2_flux_micromol_m2_s)."""
 
-    codigo = models.CharField("código", max_length=80, unique=True)
-    descripcion = models.CharField("descripción", max_length=255, blank=True)
+    codigo = models.CharField(
+        "código", max_length=80, unique=True,
+        help_text="Código corto de la unidad de medida (ej. co2_flux_micromol_m2_s).",
+    )
+    descripcion = models.CharField(
+        "descripción", max_length=255, blank=True,
+        help_text="Descripción legible de la unidad de medida.",
+    )
     magnitud = models.CharField(
         "magnitud", max_length=60, blank=True,
         help_text="flujo, concentración, temperatura, …",
@@ -27,9 +33,18 @@ class UnidadMedida(TimestampedModel):
 class Equipo(TimestampedModel):
     """Equipo analizador (picarro, EGM, Licor, …) con modelo y serial."""
 
-    modelo = models.CharField("modelo", max_length=120, blank=True)
-    serial = models.CharField("serial", max_length=120, blank=True)
-    descripcion = models.CharField("descripción", max_length=255, blank=True)
+    modelo = models.CharField(
+        "modelo", max_length=120, blank=True,
+        help_text="Modelo del equipo analizador (ej. Picarro G4301, LI-7810).",
+    )
+    serial = models.CharField(
+        "serial", max_length=120, blank=True,
+        help_text="Número de serie del equipo, para identificar el instrumento físico usado.",
+    )
+    descripcion = models.CharField(
+        "descripción", max_length=255, blank=True,
+        help_text="Notas adicionales sobre el equipo.",
+    )
 
     class Meta:
         verbose_name = "equipo"
@@ -84,24 +99,48 @@ class MuestraAmbiental(TimestampedModel):
         ("final", "Final"),
     ]
 
-    fecha = models.DateField("fecha", null=True, blank=True)
-    hora = models.TimeField("hora", null=True, blank=True)
+    fecha = models.DateField("fecha", null=True, blank=True, help_text="Fecha de la lectura ambiental.")
+    hora = models.TimeField("hora", null=True, blank=True, help_text="Hora de la lectura ambiental.")
     # Cuando la fuente reporta un rango (p. ej. lectura al inicio y al final
     # de la toma) en vez de un único valor, cada lectura se guarda como su
     # propia muestra ambiental distinguida por este campo. Queda opcional:
     # si la fuente ya trae un único valor, se deja vacío. El agrupado/
     # promedio de inicio+final (cuando se necesite) es un procedimiento aparte.
-    momento = models.CharField("momento", max_length=10, choices=MOMENTO_CHOICES, blank=True)
-    soil_temp = models.DecimalField("temperatura del suelo (°C)", max_digits=6, decimal_places=2, null=True, blank=True)
-    air_temp = models.DecimalField("temperatura del aire (°C)", max_digits=6, decimal_places=2, null=True, blank=True)
-    atm_press = models.DecimalField("presión atmosférica (hPa)", max_digits=8, decimal_places=2, null=True, blank=True)
-    relat_humid = models.DecimalField("humedad relativa (%)", max_digits=5, decimal_places=2, null=True, blank=True)
-    dew_point = models.DecimalField("punto de rocío (°C)", max_digits=6, decimal_places=2, null=True, blank=True)
+    momento = models.CharField(
+        "momento", max_length=10, choices=MOMENTO_CHOICES, blank=True,
+        help_text="Si la lectura corresponde al inicio o al final de la medición, cuando la fuente reporta un rango en vez de un único valor.",
+    )
+    soil_temp = models.DecimalField(
+        "temperatura del suelo (°C)", max_digits=6, decimal_places=2, null=True, blank=True,
+        help_text="Temperatura del suelo, en grados Celsius.",
+    )
+    air_temp = models.DecimalField(
+        "temperatura del aire (°C)", max_digits=6, decimal_places=2, null=True, blank=True,
+        help_text="Temperatura del aire, en grados Celsius.",
+    )
+    atm_press = models.DecimalField(
+        "presión atmosférica (hPa)", max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text="Presión atmosférica, en hectopascales (hPa).",
+    )
+    relat_humid = models.DecimalField(
+        "humedad relativa (%)", max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Humedad relativa del aire, en porcentaje.",
+    )
+    dew_point = models.DecimalField(
+        "punto de rocío (°C)", max_digits=6, decimal_places=2, null=True, blank=True,
+        help_text="Punto de rocío, en grados Celsius.",
+    )
     # Positivo = agua sobre la superficie (encharcamiento); negativo = nivel
     # freático por debajo de la superficie. Mismo signo que se usa en la
     # literatura de humedales/turberas para el nivel del agua.
-    water_level = models.DecimalField("nivel del agua (cm)", max_digits=6, decimal_places=2, null=True, blank=True)
-    microtopo = models.CharField("microtopología (microtopography)", max_length=10, choices=MICROTOPO_CHOICES, blank=True)
+    water_level = models.DecimalField(
+        "nivel del agua (cm)", max_digits=6, decimal_places=2, null=True, blank=True,
+        help_text="Nivel del agua respecto a la superficie, en centímetros: positivo indica encharcamiento, negativo indica nivel freático por debajo de la superficie.",
+    )
+    microtopo = models.CharField(
+        "microtopología (microtopography)", max_length=10, choices=MICROTOPO_CHOICES, blank=True,
+        help_text="Microtopografía del punto de medición.",
+    )
     # Obligatorio: sin unidad de muestreo no se sabe a qué lugar corresponde
     # la lectura. Permite cargar clima de forma independiente de una
     # MuestraGEI (p. ej. un archivo de estación meteorológica), pero siempre
@@ -137,8 +176,14 @@ class MuestraAmbiental(TimestampedModel):
 class MuestraGEI(TimestampedModel):
     """Evento de medición de flujo de gas de efecto invernadero (CO₂, CH₄ o N₂O): un equipo analizador conectado a un tubo."""
 
-    tubo = models.CharField("tubo", max_length=80, blank=True)
-    gas = models.CharField("gas", max_length=4, choices=TipoMuestra.GAS_CHOICES, blank=True)
+    tubo = models.CharField(
+        "tubo", max_length=80, blank=True,
+        help_text="Identificador del tubo/cámara conectado al equipo para esta medición.",
+    )
+    gas = models.CharField(
+        "gas", max_length=4, choices=TipoMuestra.GAS_CHOICES, blank=True,
+        help_text="Gas medido en esta muestra: CO₂, CH₄ o N₂O.",
+    )
     analizador = models.ForeignKey(
         Equipo, on_delete=models.PROTECT, related_name="muestras_gei",
         null=True, blank=True, verbose_name="analizador",
@@ -183,12 +228,24 @@ class SubmuestraGEI(TimestampedModel):
         MuestraGEI, on_delete=models.CASCADE, related_name="submuestras",
         verbose_name="muestra GEI",
     )
-    n_toma = models.PositiveSmallIntegerField("número de toma", null=True, blank=True)
-    fecha = models.DateField("fecha de la toma", null=True, blank=True)
-    hora = models.TimeField("hora de la toma", null=True, blank=True)
-    momento = models.CharField("momento", max_length=10, choices=MOMENTO_CHOICES, blank=True)
-    condicion_luz = models.CharField("condición de luz", max_length=15, choices=CONDICION_LUZ_CHOICES, blank=True)
-    valor = models.DecimalField("valor del flujo", max_digits=14, decimal_places=6, null=True, blank=True)
+    n_toma = models.PositiveSmallIntegerField(
+        "número de toma", null=True, blank=True,
+        help_text="Número de orden de la toma dentro de la muestra (ej. 1 de ~4 tomas sucesivas).",
+    )
+    fecha = models.DateField("fecha de la toma", null=True, blank=True, help_text="Fecha en la que se realizó esta toma.")
+    hora = models.TimeField("hora de la toma", null=True, blank=True, help_text="Hora en la que se realizó esta toma.")
+    momento = models.CharField(
+        "momento", max_length=10, choices=MOMENTO_CHOICES, blank=True,
+        help_text="Si la toma corresponde al inicio o al final de la medición.",
+    )
+    condicion_luz = models.CharField(
+        "condición de luz", max_length=15, choices=CONDICION_LUZ_CHOICES, blank=True,
+        help_text="Condición de luz bajo la que se tomó la muestra.",
+    )
+    valor = models.DecimalField(
+        "valor del flujo", max_digits=14, decimal_places=6, null=True, blank=True,
+        help_text="Valor medido del flujo de gas, en la unidad reportada por la muestra (MuestraGEI.unidad_medida).",
+    )
 
     class Meta:
         verbose_name = "submuestra GEI"

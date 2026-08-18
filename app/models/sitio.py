@@ -1,7 +1,9 @@
+from django.contrib.gis.db import models as gis_models
+from django.contrib.gis.geos import Point
 from django.db import models
 
 from .base import TimestampedModel
-from .geo import Municipio, SistemaReferencia
+from .geo import SistemaReferencia, Vereda
 from .cobertura import Cobertura, Disturbio, Vegetacion
 from .datos import FuenteDatos
 
@@ -46,23 +48,53 @@ class Sitio(TimestampedModel):
         ("privada", "Privada"),
     ]
 
-    codigo_metadatos = models.CharField("código de metadatos", max_length=80, blank=True)
-    nombre = models.CharField("nombre", max_length=255)
+    codigo_metadatos = models.CharField(
+        "código de metadatos", max_length=80, blank=True,
+        help_text="Código del sitio en el sistema de metadatos externo, si aplica.",
+    )
+    nombre = models.CharField("nombre", max_length=255, help_text="Nombre del sitio de estudio.")
 
-    latitud = models.DecimalField("latitud", max_digits=10, decimal_places=7)
-    longitud = models.DecimalField("longitud", max_digits=10, decimal_places=7)
+    latitud = models.DecimalField(
+        "latitud", max_digits=10, decimal_places=7,
+        help_text="Latitud del sitio en grados decimales (WGS84). Fuente de verdad editable; de aquí se deriva la geometría del punto (geom).",
+    )
+    longitud = models.DecimalField(
+        "longitud", max_digits=10, decimal_places=7,
+        help_text="Longitud del sitio en grados decimales (WGS84). Fuente de verdad editable; de aquí se deriva la geometría del punto (geom).",
+    )
+    geom = gis_models.PointField(
+        "geometría", srid=4326, null=True, blank=True, editable=False,
+    )
     sistema_referencia = models.ForeignKey(
         SistemaReferencia, on_delete=models.PROTECT, related_name="sitios",
         null=True, blank=True,
     )
-    altitud = models.DecimalField("altitud (m.s.n.m.)", max_digits=8, decimal_places=2, null=True, blank=True)
-    pendiente = models.CharField("pendiente", max_length=30, choices=PENDIENTE_CHOICES, blank=True)
-    topografia = models.CharField("topografía", max_length=24, choices=TOPOGRAFIA_CHOICES, blank=True)
-    uso_actual = models.CharField("uso actual del suelo", max_length=30, choices=USO_ACTUAL_CHOICES, blank=True)
-    propiedad_tierra = models.CharField("propiedad de la tierra", max_length=10, choices=PROPIEDAD_CHOICES, blank=True)
-    intervenido = models.BooleanField("intervenido", default=False)
+    altitud = models.DecimalField(
+        "altitud (m.s.n.m.)", max_digits=8, decimal_places=2, null=True, blank=True,
+        help_text="Altitud del sitio sobre el nivel del mar, en metros.",
+    )
+    pendiente = models.CharField(
+        "pendiente", max_length=30, choices=PENDIENTE_CHOICES, blank=True,
+        help_text="Categoría de pendiente del terreno en el sitio.",
+    )
+    topografia = models.CharField(
+        "topografía", max_length=24, choices=TOPOGRAFIA_CHOICES, blank=True,
+        help_text="Posición topográfica del sitio (cresta, ladera, valle, etc.).",
+    )
+    uso_actual = models.CharField(
+        "uso actual del suelo", max_length=30, choices=USO_ACTUAL_CHOICES, blank=True,
+        help_text="Uso actual del suelo en el sitio.",
+    )
+    propiedad_tierra = models.CharField(
+        "propiedad de la tierra", max_length=10, choices=PROPIEDAD_CHOICES, blank=True,
+        help_text="Si la tierra del sitio es de propiedad pública o privada.",
+    )
+    intervenido = models.BooleanField(
+        "intervenido", default=False,
+        help_text="Si el sitio ha sido intervenido/alterado por actividad humana.",
+    )
 
-    municipio = models.ForeignKey(Municipio, on_delete=models.PROTECT, related_name="sitios", null=True, blank=True)
+    vereda = models.ForeignKey(Vereda, on_delete=models.PROTECT, related_name="sitios", null=True, blank=True)
     disturbio = models.ForeignKey(Disturbio, on_delete=models.SET_NULL, related_name="sitios", null=True, blank=True)
     vegetacion = models.ForeignKey(Vegetacion, on_delete=models.SET_NULL, related_name="sitios", null=True, blank=True)
     cobertura = models.ForeignKey(Cobertura, on_delete=models.SET_NULL, related_name="sitios", null=True, blank=True)
@@ -75,11 +107,22 @@ class Sitio(TimestampedModel):
     def __str__(self):
         return self.nombre
 
+    def save(self, *args, **kwargs):
+        # geom se deriva de latitud/longitud (fuente de verdad) para poder
+        # usarlo en queries espaciales (p. ej. backfill_sitio_vereda) sin
+        # duplicar la edición manual de coordenadas en dos campos.
+        if self.latitud is not None and self.longitud is not None:
+            self.geom = Point(float(self.longitud), float(self.latitud), srid=4326)
+        super().save(*args, **kwargs)
+
 
 class UnidadMuestreoTipo(TimestampedModel):
     """Catálogo de tipos de unidad de muestreo (parcela, transecto, conglomerado, plot)."""
 
-    nombre = models.CharField("nombre", max_length=80, unique=True)
+    nombre = models.CharField(
+        "nombre", max_length=80, unique=True,
+        help_text="Nombre del tipo de unidad de muestreo (ej. parcela, transecto, conglomerado, plot).",
+    )
 
     class Meta:
         verbose_name = "tipo de unidad de muestreo"
@@ -101,12 +144,18 @@ class UnidadExperimental(TimestampedModel):
         "app.Proyecto", on_delete=models.PROTECT,
         related_name="unidades_experimentales", verbose_name="proyecto",
     )
-    nombre = models.CharField("nombre", max_length=255)
+    nombre = models.CharField(
+        "nombre", max_length=255,
+        help_text="Nombre de la unidad experimental (agrupa las unidades de muestreo que reciben el mismo tratamiento).",
+    )
     tipo = models.ForeignKey(
         UnidadMuestreoTipo, on_delete=models.PROTECT, related_name="unidades_experimentales",
         null=True, blank=True, verbose_name="tipo",
     )
-    descripcion = models.TextField("descripción", blank=True)
+    descripcion = models.TextField(
+        "descripción", blank=True,
+        help_text="Notas adicionales sobre la unidad experimental.",
+    )
 
     class Meta:
         verbose_name = "unidad experimental"
@@ -128,7 +177,10 @@ class UnidadMuestreo(TimestampedModel):
 
     # Indexado: es el identificador natural de la unidad (p. ej. "3"), usado
     # para encontrar/crear la unidad correspondiente en cada fila del ETL.
-    nombre = models.CharField("nombre", max_length=255, db_index=True)
+    nombre = models.CharField(
+        "nombre", max_length=255, db_index=True,
+        help_text="Identificador de la unidad de muestreo tal como lo reporta la fuente (ej. el número o código de la parcela/punto).",
+    )
     tipo = models.ForeignKey(
         UnidadMuestreoTipo, on_delete=models.PROTECT, related_name="unidades_muestreo",
         verbose_name="tipo",
@@ -147,6 +199,7 @@ class UnidadMuestreo(TimestampedModel):
     )
     fecha_instalacion = models.DateField(
         "fecha instalación unidad de muestreo", null=True, blank=True,
+        help_text="Fecha en la que se instaló o estableció la unidad de muestreo en campo.",
     )
 
     class Meta:
