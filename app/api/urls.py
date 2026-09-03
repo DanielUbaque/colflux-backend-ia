@@ -58,6 +58,8 @@ urlpatterns = [
     path("api/reglas-autollenado/<str:codigo>/aplicar/", aplicar_regla_autollenado, name="reglas-autollenado-aplicar"),
     path("api/reglas-autollenado/lotes/<uuid:lote_id>/deshacer/", deshacer_lote_autollenado, name="reglas-autollenado-deshacer"),
     path("api/asistente/chat/", asistente_chat, name="asistente-chat"),
+    path("api/asistente/chat", asistente_chat),
+    path("api/asistente/salud", asistente_salud),
     path("api/asistente/salud/", asistente_salud, name="asistente-salud"),
     path("api/geo/sitios/", sitios_geojson, name="geo-sitios"),
     path("api/geo/series/", series_co2, name="geo-series"),

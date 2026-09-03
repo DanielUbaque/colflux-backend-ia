@@ -71,7 +71,8 @@ def chat(request):
         resultado = responder(mensaje, usuario_externo_id=usuario, origen=origen)
     except Exception as exc:
         return JsonResponse(
-            {"error": f"El asistente no pudo responder: {type(exc).__name__}"}, status=502)
+            {"error": f"El asistente no pudo responder: {type(exc).__name__}",
+             "detalle": str(exc)[:400]}, status=502)
 
     return JsonResponse({
         "answer": resultado.get("answer", ""),

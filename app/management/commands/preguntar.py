@@ -23,7 +23,13 @@ class Command(BaseCommand):
         self.stdout.write("")
         self.stdout.write(self.style.HTTP_INFO(f'> {opciones["texto"]}'))
         self.stdout.write("")
-        self.stdout.write(resultado["respuesta"] or "(sin respuesta)")
+        self.stdout.write(resultado.get("answer") or "(sin respuesta)")
+        fuentes = resultado.get("sources") or []
+        if fuentes:
+            self.stdout.write("")
+            self.stdout.write(self.style.HTTP_INFO(f"fuentes citadas: {len(fuentes)}"))
+            for f in fuentes[:5]:
+                self.stdout.write(f"  [{f['score']}] {f['source']}")
         if resultado.get("herramientas"):
             self.stdout.write("")
             self.stdout.write(self.style.WARNING(
