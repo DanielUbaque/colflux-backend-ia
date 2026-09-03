@@ -12,3 +12,8 @@ data/
 !data/dump.sql
 media/
 */settings.local.json
+# Configuracion sensible y archivos locales del servidor
+.env.prod
+*.bak
+listar_modelos.py
+prueba_gemini.py

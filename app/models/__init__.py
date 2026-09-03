@@ -26,7 +26,17 @@ from .datos import CargaArchivo, FuenteDatos, MapeoColumna, RolUsuario, Usuario,
 
 from .reglas import AplicacionRegla, ReglaAutollenado
 
+from .asistente import (
+    DocumentoConocimiento, FragmentoConocimiento, MedicionRapidaChat,
+    RegistroChatIA, TerminoCampo,
+)
+
 __all__ = [
+    "FragmentoConocimiento",
+    "DocumentoConocimiento",
+    "MedicionRapidaChat",
+    "RegistroChatIA",
+    "TerminoCampo",
     "TimestampedModel",
     # Geografía
     "Departamento",
