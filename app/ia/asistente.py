@@ -6,8 +6,12 @@ que redacte la respuesta final. Gemini nunca toca la base de datos.
 
 La unica funcion que escribe no escribe: propone. El dato queda guardado como
 pendiente en RegistroChatIA hasta que la persona confirme explicitamente.
+
+La respuesta incluye las fuentes consultadas con el mismo formato que espera
+el frontend: {source, content, score}.
 """
 
+import os
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
@@ -15,7 +19,7 @@ from google.genai import types
 
 from app.models import MedicionRapidaChat, RegistroChatIA
 
-from .busqueda import buscar_terminos
+from .busqueda import buscar_fragmentos, buscar_terminos
 from .cliente import MODELO_GENERACION, obtener_cliente
 from .consultas import (
     VARIABLES_VALIDAS, _resolver_sitio, consultar_promedio,
@@ -24,20 +28,34 @@ from .consultas import (
 
 MAX_VUELTAS = 5
 
+# Por debajo de esta similitud un resultado no se considera relevante y no se
+# cita como fuente. Evita que el asistente respalde una respuesta con una
+# coincidencia que en realidad no venia al caso.
+UMBRAL_SIMILITUD = float(os.environ.get("ASISTENTE_UMBRAL_SIMILITUD", "0.60"))
+
 INSTRUCCION_SISTEMA = """Eres el asistente de COLFLUX, una plataforma de monitoreo
 de flujos de gases de efecto invernadero en ecosistemas colombianos, sobre todo
 paramos y humedales.
 
-Reglas:
-- Responde siempre en espanol, de forma breve y concreta.
+Como responder:
+- Siempre en espanol, breve y concreto.
+- Si te saludan o hacen una pregunta general, conversa con naturalidad. No
+  fuerces una busqueda cuando no hace falta.
 - Nunca inventes cifras. Si una funcion dice que no hay datos, dilo tal cual.
-- Cuando cites un dato numerico, menciona de que fuente viene (medicion formal
-  del ETL o registrada por chat).
-- Para preguntas sobre observaciones cualitativas de campo (olores, colores,
-  texturas del suelo, sensaciones ambientales) usa buscar_diccionario.
-- Si la persona quiere registrar una medicion, usa proponer_guardar_medicion.
-  Esa funcion NO guarda: solo prepara el dato. Muestra a la persona lo que
-  entendiste y pidele que confirme escribiendo "confirmo".
+- Cuando cites un dato numerico, menciona de que fuente viene: medicion formal
+  del ETL o registrada por chat.
+- Si respondes con conocimiento general y no con datos de la plataforma,
+  aclaralo.
+
+Herramientas:
+- Para observaciones cualitativas de campo (olores, colores, texturas del
+  suelo, sensaciones ambientales) usa buscar_diccionario.
+- Para preguntas sobre entrevistas, informes o notas usa buscar_documentos.
+- Para cifras usa consultar_promedio o consultar_ultima_medicion. Si no sabes
+  el nombre exacto de un sitio, resuelvelo antes con listar_sitios.
+- Si la persona quiere registrar una medicion usa proponer_guardar_medicion.
+  Esa funcion NO guarda: solo prepara el dato. Muestra lo que entendiste y
+  pide que confirmen escribiendo "confirmo".
 - Si falta el sitio, la fecha, la variable o el valor, preguntalo antes de
   proponer nada.
 """
@@ -101,6 +119,18 @@ FUNCIONES = [
         ),
     ),
     types.FunctionDeclaration(
+        name="buscar_documentos",
+        description=("Busca por significado en entrevistas, informes y notas de campo indexados. "
+                     "Devuelve los parrafos mas relevantes con su documento de origen."),
+        parameters=types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "texto": types.Schema(type=types.Type.STRING, description="Lo que se quiere encontrar."),
+            },
+            required=["texto"],
+        ),
+    ),
+    types.FunctionDeclaration(
         name="proponer_guardar_medicion",
         description=("Prepara el registro de una medicion dictada por chat. NO la guarda: "
                      "devuelve un resumen para que la persona lo confirme."),
@@ -119,21 +149,64 @@ FUNCIONES = [
 ]
 
 
-def _buscar_diccionario(texto, limite=4):
-    resultados = buscar_terminos(texto, limite=limite)
-    return {
-        "coincidencias": [
-            {
-                "similitud": round((1 - t.distancia) * 100, 1),
-                "categoria": t.categoria,
-                "observacion": t.observacion_campo,
-                "variable_asociada": t.variable_asociada,
-                "regla": t.regla_cuantitativa,
-                "interpretacion": t.interpretacion,
-            }
-            for t in resultados
-        ]
-    }
+def _similitud(distancia):
+    return round(max(0.0, min(1.0, 1 - float(distancia))), 4)
+
+
+def _buscar_diccionario(texto, fuentes, limite=4):
+    encontrados = buscar_terminos(texto, limite=limite)
+    coincidencias = []
+    for t in encontrados:
+        score = _similitud(t.distancia)
+        if score < UMBRAL_SIMILITUD:
+            continue
+        contenido = " | ".join(p for p in [
+            t.observacion_campo, t.definicion_ecologica,
+            f"variable: {t.variable_asociada}" if t.variable_asociada else "",
+            f"regla: {t.regla_cuantitativa}" if t.regla_cuantitativa else "",
+            f"interpretacion: {t.interpretacion}" if t.interpretacion else "",
+        ] if p)
+        coincidencias.append({
+            "similitud": score,
+            "categoria": t.categoria,
+            "observacion": t.observacion_campo,
+            "variable_asociada": t.variable_asociada,
+            "regla": t.regla_cuantitativa,
+            "interpretacion": t.interpretacion,
+        })
+        fuentes.append({
+            "source": f"Diccionario de campo - {t.categoria}" if t.categoria else "Diccionario de campo",
+            "content": contenido,
+            "score": score,
+        })
+    if not coincidencias:
+        return {"coincidencias": [],
+                "mensaje": "Ninguna entrada del diccionario supera el umbral de relevancia."}
+    return {"coincidencias": coincidencias}
+
+
+def _buscar_documentos(texto, fuentes, limite=4):
+    encontrados = buscar_fragmentos(texto, limite=limite)
+    resultados = []
+    for f in encontrados:
+        score = _similitud(f.distancia)
+        if score < UMBRAL_SIMILITUD:
+            continue
+        resultados.append({
+            "similitud": score,
+            "documento": f.documento.titulo,
+            "tipo": f.documento.get_tipo_display(),
+            "texto": f.texto,
+        })
+        fuentes.append({
+            "source": f.documento.titulo,
+            "content": f.texto,
+            "score": score,
+        })
+    if not resultados:
+        return {"fragmentos": [],
+                "mensaje": "No hay documentos indexados que respondan a eso."}
+    return {"fragmentos": resultados}
 
 
 def _proponer_guardar(sitio, fecha, variable, valor, unidad=""):
@@ -171,13 +244,28 @@ def _proponer_guardar(sitio, fecha, variable, valor, unidad=""):
     }
 
 
-EJECUTORES = {
-    "listar_sitios": lambda **kw: listar_sitios(kw.get("filtro")),
-    "consultar_promedio": lambda **kw: consultar_promedio(**kw),
-    "consultar_ultima_medicion": lambda **kw: consultar_ultima_medicion(**kw),
-    "buscar_diccionario": lambda **kw: _buscar_diccionario(kw.get("texto", "")),
-    "proponer_guardar_medicion": lambda **kw: _proponer_guardar(**kw),
-}
+def _ejecutar(nombre, argumentos, fuentes):
+    """Despacha una llamada de funcion. Nunca lanza excepciones hacia afuera:
+    un error se devuelve como resultado para que el modelo pueda corregirse."""
+    try:
+        if nombre == "listar_sitios":
+            return listar_sitios(argumentos.get("filtro"))
+        if nombre == "consultar_promedio":
+            return consultar_promedio(**argumentos)
+        if nombre == "consultar_ultima_medicion":
+            return consultar_ultima_medicion(**argumentos)
+        if nombre == "buscar_diccionario":
+            return _buscar_diccionario(argumentos.get("texto", ""), fuentes)
+        if nombre == "buscar_documentos":
+            return _buscar_documentos(argumentos.get("texto", ""), fuentes)
+        if nombre == "proponer_guardar_medicion":
+            return _proponer_guardar(**argumentos)
+        return {"error": f"Funcion desconocida: {nombre}"}
+    except Exception as exc:
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+CONFIRMACIONES = {"confirmo", "confirmar", "si confirmo", "si, confirmo", "sí, confirmo", "sí confirmo"}
 
 
 def confirmar_pendiente(usuario_externo_id, origen="api"):
@@ -212,17 +300,20 @@ def confirmar_pendiente(usuario_externo_id, origen="api"):
 
 
 def responder(pregunta, usuario_externo_id="cli", origen="api"):
-    """Punto de entrada unico. Devuelve un diccionario con la respuesta."""
+    """Punto de entrada unico. Devuelve {answer, sources, ...}."""
     texto = (pregunta or "").strip()
-    if texto.lower() in {"confirmo", "confirmar", "si, confirmo", "sí, confirmo"}:
+
+    if texto.lower().rstrip(".!") in CONFIRMACIONES:
         resultado = confirmar_pendiente(usuario_externo_id, origen)
+        mensaje = resultado.get("mensaje") or resultado.get("error", "")
         RegistroChatIA.objects.create(
             origen=origen, usuario_externo_id=usuario_externo_id,
-            pregunta=texto, respuesta=resultado.get("mensaje") or resultado.get("error", ""),
+            pregunta=texto, respuesta=mensaje,
             herramienta_usada="confirmar_pendiente", confirmado=True,
         )
-        return {"respuesta": resultado.get("mensaje") or resultado.get("error"),
-                "herramientas": ["confirmar_pendiente"]}
+        return {"answer": mensaje, "sources": [],
+                "herramientas": ["confirmar_pendiente"],
+                "pendiente_de_confirmacion": None}
 
     cliente = obtener_cliente()
     config = types.GenerateContentConfig(
@@ -234,7 +325,9 @@ def responder(pregunta, usuario_externo_id="cli", origen="api"):
 
     historial = [types.Content(role="user", parts=[types.Part(text=texto)])]
     herramientas_usadas = []
+    fuentes = []
     pendiente = None
+    respuesta = None
 
     for _ in range(MAX_VUELTAS):
         respuesta = cliente.models.generate_content(
@@ -250,20 +343,21 @@ def responder(pregunta, usuario_externo_id="cli", origen="api"):
             nombre = llamada.name
             argumentos = dict(llamada.args or {})
             herramientas_usadas.append(nombre)
-            ejecutor = EJECUTORES.get(nombre)
-            if ejecutor is None:
-                salida = {"error": f"Funcion desconocida: {nombre}"}
-            else:
-                try:
-                    salida = ejecutor(**argumentos)
-                except Exception as exc:
-                    salida = {"error": f"{type(exc).__name__}: {exc}"}
+            salida = _ejecutar(nombre, argumentos, fuentes)
             if isinstance(salida, dict) and salida.get("pendiente_de_confirmacion"):
                 pendiente = salida["resumen"]
-            partes.append(types.Part.from_function_response(name=nombre, response={"resultado": salida}))
+            partes.append(types.Part.from_function_response(
+                name=nombre, response={"resultado": salida}))
         historial.append(types.Content(role="user", parts=partes))
 
-    texto_respuesta = (respuesta.text or "").strip()
+    texto_respuesta = (respuesta.text or "").strip() if respuesta else ""
+
+    unicas = {}
+    for f in fuentes:
+        clave = (f["source"], f["content"][:80])
+        if clave not in unicas or f["score"] > unicas[clave]["score"]:
+            unicas[clave] = f
+    fuentes_finales = sorted(unicas.values(), key=lambda f: f["score"], reverse=True)
 
     RegistroChatIA.objects.create(
         origen=origen, usuario_externo_id=usuario_externo_id,
@@ -274,7 +368,8 @@ def responder(pregunta, usuario_externo_id="cli", origen="api"):
     )
 
     return {
-        "respuesta": texto_respuesta,
+        "answer": texto_respuesta,
+        "sources": fuentes_finales,
         "herramientas": list(dict.fromkeys(herramientas_usadas)),
         "pendiente_de_confirmacion": pendiente,
     }

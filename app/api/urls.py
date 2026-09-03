@@ -2,6 +2,7 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 from rest_framework.routers import DefaultRouter
 
+from app.api.asistente.views import chat as asistente_chat, salud as asistente_salud
 from app.api.dashboard.views import DashboardView, DataModelView, VisualizerView, chart_data
 from app.api.datos.views import FuenteDatosViewSet, fuentes_datos_api
 from app.api.etl.views import (
@@ -56,6 +57,8 @@ urlpatterns = [
     path("api/reglas-autollenado/<str:codigo>/previsualizar/", previsualizar_regla_autollenado, name="reglas-autollenado-previsualizar"),
     path("api/reglas-autollenado/<str:codigo>/aplicar/", aplicar_regla_autollenado, name="reglas-autollenado-aplicar"),
     path("api/reglas-autollenado/lotes/<uuid:lote_id>/deshacer/", deshacer_lote_autollenado, name="reglas-autollenado-deshacer"),
+    path("api/asistente/chat/", asistente_chat, name="asistente-chat"),
+    path("api/asistente/salud/", asistente_salud, name="asistente-salud"),
     path("api/geo/sitios/", sitios_geojson, name="geo-sitios"),
     path("api/geo/series/", series_co2, name="geo-series"),
     path("api/geo/resumen/", resumen_geografico, name="geo-resumen"),
