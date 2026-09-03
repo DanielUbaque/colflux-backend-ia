@@ -1,7 +1,14 @@
-"""Punto unico de contacto con la API de Google Gemini.
+"""Embeddings y datos del proveedor de generacion.
 
-Todo el codigo del asistente pasa por aqui, para que cambiar de modelo o de
-proveedor sea una edicion en un solo archivo.
+Los embeddings se generan con Google. Es deliberado: Groq no ofrece modelos de
+embeddings, solo de lenguaje, y la cuota de embeddings de Google es holgada.
+La generacion de texto se delega a app/ia/proveedores.py, que permite cambiar
+de proveedor con una variable de entorno.
+
+Advertencia: si algun dia se cambia MODELO_EMBEDDING, hay que regenerar todos
+los vectores guardados. Modelos distintos producen espacios numericos
+incompatibles y las comparaciones darian resultados sin sentido, sin error
+visible.
 """
 
 import math
@@ -11,9 +18,8 @@ from functools import lru_cache
 from google import genai
 from google.genai import types
 
-MODELO_GENERACION = "gemini-3.5-flash"
-MODELO_EMBEDDING = "gemini-embedding-001"
-DIMENSIONES = 768
+MODELO_EMBEDDING = os.environ.get("IA_MODELO_EMBEDDING", "gemini-embedding-001")
+DIMENSIONES = int(os.environ.get("IA_DIMENSIONES", "768"))
 TAMANO_LOTE = 20
 
 
@@ -22,15 +28,13 @@ def obtener_cliente():
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError(
-            "Falta la variable de entorno GEMINI_API_KEY. "
-            "Agregala en .env.prod y recrea el contenedor."
+            "Falta GEMINI_API_KEY. Se necesita para los embeddings aunque la "
+            "generacion de texto use otro proveedor."
         )
     return genai.Client(api_key=api_key)
 
 
 def _normalizar(vector):
-    """Google recomienda normalizar cuando se pide una dimensionalidad distinta
-    a la nativa del modelo (3072). Sin esto las distancias quedan sesgadas."""
     norma = math.sqrt(sum(v * v for v in vector))
     if norma == 0:
         return list(vector)
@@ -38,9 +42,6 @@ def _normalizar(vector):
 
 
 def generar_embeddings(textos, task_type="SEMANTIC_SIMILARITY"):
-    """Recibe una lista de textos y devuelve una lista de vectores de 768
-    dimensiones, en el mismo orden. Va por lotes para no pasarse de los limites
-    de la capa gratuita."""
     cliente = obtener_cliente()
     salida = []
     for inicio in range(0, len(textos), TAMANO_LOTE):
@@ -62,15 +63,9 @@ def generar_embedding(texto, task_type="SEMANTIC_SIMILARITY"):
     return generar_embeddings([texto], task_type=task_type)[0]
 
 
-def generar_texto(prompt, instruccion_sistema=None):
-    """Llamada simple de generacion, sin herramientas. Util para pruebas."""
-    cliente = obtener_cliente()
-    config = None
-    if instruccion_sistema:
-        config = types.GenerateContentConfig(system_instruction=instruccion_sistema)
-    respuesta = cliente.models.generate_content(
-        model=MODELO_GENERACION,
-        contents=prompt,
-        config=config,
-    )
-    return (respuesta.text or "").strip()
+def descripcion_proveedor():
+    """Para el endpoint de salud."""
+    from .proveedores import obtener_proveedor
+    p = obtener_proveedor()
+    return {"proveedor": p.nombre, "modelo_generacion": p.modelo,
+            "modelo_embedding": MODELO_EMBEDDING, "dimensiones": DIMENSIONES}

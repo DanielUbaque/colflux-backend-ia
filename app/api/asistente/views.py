@@ -86,12 +86,50 @@ def chat(request):
 @require_http_methods(["GET"])
 def salud(request):
     """Chequeo rapido: no llama al modelo, solo confirma que el modulo carga."""
-    from app.ia.cliente import MODELO_EMBEDDING, MODELO_GENERACION
+    from app.ia.cliente import descripcion_proveedor
 
-    return JsonResponse({
-        "status": "ok",
-        "modelo_generacion": MODELO_GENERACION,
-        "modelo_embedding": MODELO_EMBEDDING,
-        "clave_configurada": bool(os.environ.get("GEMINI_API_KEY")),
-        "limite_por_hora": LIMITE_POR_HORA,
-    })
+    datos = {"status": "ok", "limite_por_hora": LIMITE_POR_HORA}
+    try:
+        datos.update(descripcion_proveedor())
+    except Exception as exc:
+        datos["status"] = "configuracion incompleta"
+        datos["detalle"] = str(exc)[:200]
+    datos["gemini_configurado"] = bool(os.environ.get("GEMINI_API_KEY"))
+    datos["groq_configurado"] = bool(os.environ.get("GROQ_API_KEY"))
+    return JsonResponse(datos)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def historial(request):
+    """Devuelve la conversacion reciente de quien pregunta.
+
+    La pagina de chat guarda los mensajes en memoria del navegador y los
+    pierde al cambiar de vista. Con esto puede recuperarlos: la fuente de
+    verdad es la bitacora en la base de datos, no el navegador.
+    """
+    from app.ia.asistente import MEMORIA_MINUTOS
+    from app.models import RegistroChatIA
+    from datetime import timedelta
+    from django.utils import timezone
+
+    usuario = (request.GET.get("usuario") or _ip(request))[:120]
+    try:
+        limite = min(int(request.GET.get("limite", "40")), 100)
+    except ValueError:
+        limite = 40
+
+    desde = timezone.now() - timedelta(minutes=MEMORIA_MINUTOS)
+    registros = list(
+        RegistroChatIA.objects
+        .filter(usuario_externo_id=usuario, created_at__gte=desde)
+        .order_by("-created_at")[:limite]
+    )
+
+    mensajes = []
+    for r in reversed(registros):
+        if r.pregunta:
+            mensajes.append({"id": f"h{r.id}u", "role": "user", "content": r.pregunta})
+        if r.respuesta:
+            mensajes.append({"id": f"h{r.id}a", "role": "assistant", "content": r.respuesta})
+    return JsonResponse({"messages": mensajes})
