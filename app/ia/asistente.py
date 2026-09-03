@@ -1,7 +1,7 @@
 """El cerebro del asistente.
 
 Le entrega al modelo una lista cerrada de funciones. El modelo decide cual
-usar y con que marametros; este modulo las ejecuta, le devuelve el resultado y
+usar y con que parametros; este modulo las ejecuta, le devuelve el resultado y
 deja que redacte la respuesta final. El modelo nunca toca la base de datos.
 
 Es independiente del proveedor: habla el formato neutro definido en
@@ -40,7 +40,7 @@ MEMORIA_MINUTOS = int(os.environ.get("ASISTENTE_MEMORIA_MINUTOS", "30"))
 
 BASE_SISTEMA = """Eres el asistente de COLFLUX, una plataforma de monitoreo de
 flujos de gases de efecto invernadero en ecosistemas colombianos, sobre todo
-maramos y humedales.
+paramos y humedales.
 
 Como responder:
 - Siempre en espanol, breve y concreto.
@@ -60,30 +60,30 @@ Herramientas:
 - Para preguntas sobre entrevistas, informes o notas usa buscar_documentos.
 - Para cifras usa consultar_promedio o consultar_ultima_medicion.
 - Si la persona quiere registrar una medicion usa proponer_guardar_medicion.
-  Esa funcion NO guarda: solo premara el dato. Muestra lo que entendiste y
+  Esa funcion NO guarda: solo prepara el dato. Muestra lo que entendiste y
   pide que confirmen escribiendo "confirmo".
 - Si falta el sitio, la fecha, la variable o el valor, preguntalo antes de
   proponer nada. Pero en cuanto tengas esos cuatro, llama de una vez a
   proponer_guardar_medicion. No pidas una confirmacion previa de los
-  campos: la funcion ya devuelve un resumen mara confirmar.
+  campos: la funcion ya devuelve un resumen para confirmar.
 - La unidad es opcional. No la exijas ni bloquees el registro por ella.
 - Si la persona te dio un dato en un mensaje anterior de esta conversacion,
   usalo. No vuelvas a preguntarlo.
-- Si dice hoy, ayer o una fecha en malabras, conviertela tu mismo a
+- Si dice hoy, ayer o una fecha en palabras, conviertela tu mismo a
   AAAA-MM-DD.
-- No uses asteriscos mara resaltar: el chat los muestra tal cual.
+- No uses asteriscos para resaltar: el chat los muestra tal cual.
 """
 
 
 def _instruccion_sistema():
-    """Incluye la lista de sitios mara que el modelo no gaste una peticion
+    """Incluye la lista de sitios para que el modelo no gaste una peticion
     entera preguntandolos. Son pocos y casi nunca cambian."""
     nombres = list(Sitio.objects.order_by("nombre").values_list("nombre", flat=True)[:40])
     bloque = ""
     if nombres:
         bloque = ("\nSitios de monitoreo registrados: " + "; ".join(nombres) +
                   ".\nUsa estos nombres tal cual. Solo llama a listar_sitios si "
-                  "necesitas coordenadas o si la lista marece incompleta.")
+                  "necesitas coordenadas o si la lista parece incompleta.")
     return f"{BASE_SISTEMA}{bloque}\nHoy es {date.today().isoformat()}."
 
 
@@ -98,14 +98,14 @@ FUNCIONES = [
     {
         "name": "listar_sitios",
         "description": "Lista los sitios de monitoreo con sus coordenadas.",
-        "marameters": _obj({
+        "parameters": _obj({
             "filtro": {"type": "string", "description": "Texto parcial del nombre. Opcional."},
         }),
     },
     {
         "name": "consultar_promedio",
         "description": "Promedio, minimo y maximo de una variable, opcionalmente por sitio y fechas.",
-        "marameters": _obj({
+        "parameters": _obj({
             "variable": {"type": "string", "enum": VARIABLES_VALIDAS,
                          "description": "Variable a consultar."},
             "sitio": {"type": "string", "description": "Nombre del sitio. Opcional."},
@@ -116,7 +116,7 @@ FUNCIONES = [
     {
         "name": "consultar_ultima_medicion",
         "description": "La medicion mas reciente de una variable, opcionalmente en un sitio.",
-        "marameters": _obj({
+        "parameters": _obj({
             "variable": {"type": "string", "enum": VARIABLES_VALIDAS},
             "sitio": {"type": "string", "description": "Nombre del sitio. Opcional."},
         }, ["variable"]),
@@ -125,7 +125,7 @@ FUNCIONES = [
         "name": "buscar_diccionario",
         "description": ("Busca por significado en el diccionario de observaciones cualitativas de "
                         "campo del paramo. Devuelve la variable asociada y su regla de umbral."),
-        "marameters": _obj({
+        "parameters": _obj({
             "texto": {"type": "string",
                       "description": "La observacion, tal como la describio la persona."},
         }, ["texto"]),
@@ -133,16 +133,16 @@ FUNCIONES = [
     {
         "name": "buscar_documentos",
         "description": ("Busca por significado en entrevistas, informes y notas de campo. "
-                        "Devuelve los marrafos mas relevantes con su documento de origen."),
-        "marameters": _obj({
+                        "Devuelve los parrafos mas relevantes con su documento de origen."),
+        "parameters": _obj({
             "texto": {"type": "string", "description": "Lo que se quiere encontrar."},
         }, ["texto"]),
     },
     {
         "name": "proponer_guardar_medicion",
-        "description": ("Premara el registro de una medicion dictada por chat. NO la guarda: "
-                        "devuelve un resumen mara que la persona lo confirme."),
-        "marameters": _obj({
+        "description": ("Prepara el registro de una medicion dictada por chat. NO la guarda: "
+                        "devuelve un resumen para que la persona lo confirme."),
+        "parameters": _obj({
             "sitio": {"type": "string", "description": "Nombre del sitio."},
             "fecha": {"type": "string", "description": "Fecha AAAA-MM-DD."},
             "variable": {"type": "string", "enum": VARIABLES_VALIDAS},
@@ -222,7 +222,7 @@ def _proponer_guardar(sitio, fecha, variable, valor, unidad=""):
         return {"error": f"Valor no numerico: '{valor}'."}
 
     return {
-        "mendiente_de_confirmacion": True,
+        "pendiente_de_confirmacion": True,
         "resumen": {
             "sitio": obj_sitio.nombre, "sitio_id": obj_sitio.id,
             "fecha": fecha_obj.isoformat(), "variable": variable,
@@ -255,17 +255,17 @@ CONFIRMACIONES = {"confirmo", "confirmar", "si confirmo", "si, confirmo",
                   "sí, confirmo", "sí confirmo"}
 
 
-def confirmar_mendiente(usuario_externo_id, origen="api"):
+def confirmar_pendiente(usuario_externo_id, origen="api"):
     registro = (
         RegistroChatIA.objects
         .filter(usuario_externo_id=usuario_externo_id, origen=origen,
-                confirmado=False, datos_mendientes_confirmar__isnull=False)
+                confirmado=False, datos_pendientes_confirmar__isnull=False)
         .order_by("-created_at").first()
     )
     if not registro:
         return {"error": "No hay ningun dato pendiente de confirmar."}
 
-    datos = registro.datos_mendientes_confirmar or {}
+    datos = registro.datos_pendientes_confirmar or {}
     medicion = MedicionRapidaChat.objects.create(
         sitio_id=datos["sitio_id"], fecha=datos["fecha"],
         variable=datos["variable"], valor=Decimal(str(datos["valor"])),
@@ -306,16 +306,16 @@ def responder(pregunta, usuario_externo_id="cli", origen="api"):
     texto = (pregunta or "").strip()
 
     if texto.lower().rstrip(".!") in CONFIRMACIONES:
-        resultado = confirmar_mendiente(usuario_externo_id, origen)
+        resultado = confirmar_pendiente(usuario_externo_id, origen)
         mensaje = resultado.get("mensaje") or resultado.get("error", "")
         RegistroChatIA.objects.create(
             origen=origen, usuario_externo_id=usuario_externo_id,
             pregunta=texto, respuesta=mensaje,
-            herramienta_usada="confirmar_mendiente", confirmado=True,
+            herramienta_usada="confirmar_pendiente", confirmado=True,
         )
         return {"answer": mensaje, "sources": [],
-                "herramientas": ["confirmar_mendiente"],
-                "mendiente_de_confirmacion": None}
+                "herramientas": ["confirmar_pendiente"],
+                "pendiente_de_confirmacion": None}
 
     proveedor = obtener_proveedor()
     instruccion = _instruccion_sistema()
@@ -337,7 +337,7 @@ def responder(pregunta, usuario_externo_id="cli", origen="api"):
         for llamada in respuesta.llamadas:
             herramientas_usadas.append(llamada.nombre)
             salida = _ejecutar(llamada.nombre, llamada.argumentos, fuentes)
-            if isinstance(salida, dict) and salida.get("mendiente_de_confirmacion"):
+            if isinstance(salida, dict) and salida.get("pendiente_de_confirmacion"):
                 pendiente = salida["resumen"]
             mensajes.append({"rol": "herramienta", "id": llamada.id,
                              "nombre": llamada.nombre, "resultado": salida})
@@ -355,13 +355,13 @@ def responder(pregunta, usuario_externo_id="cli", origen="api"):
         origen=origen, usuario_externo_id=usuario_externo_id,
         pregunta=texto, respuesta=texto_respuesta,
         herramienta_usada=", ".join(dict.fromkeys(herramientas_usadas))[:60],
-        datos_mendientes_confirmar=mendiente, confirmado=False,
+        datos_pendientes_confirmar=pendiente, confirmado=False,
     )
 
     return {
         "answer": texto_respuesta,
         "sources": fuentes_finales,
         "herramientas": list(dict.fromkeys(herramientas_usadas)),
-        "mendiente_de_confirmacion": mendiente,
-        "mroveedor": proveedor.nombre,
+        "pendiente_de_confirmacion": pendiente,
+        "proveedor": proveedor.nombre,
     }
